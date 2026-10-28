@@ -3,6 +3,10 @@
 Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [SemVer](https://semver.org/lang/it/).
 
 ## [Unreleased]
+### Changed
+- Preset ufficiale "IAVATAR" in `presets/ReShade.ini`, tarato in gioco: 1 passata, stile naturale,
+  maschera personaggi, stabilizzazione del look (~3,5 ms GPU a 1080p su RTX 5060 Ti).
+  Pannello ReShade su F9.
 ### Added
 - Modulo A v0.1.0: installer `moduleA-enabler/src/IAVATAR_NeuralViceCity.ps1` (PowerShell 5.1)
   con `-Status`, `-Verify`, `-Install`, `-Uninstall`, `-DryRun`.
