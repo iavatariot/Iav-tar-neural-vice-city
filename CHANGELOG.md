@@ -14,6 +14,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [
   - Transazioni con manifest, backup verificati, rollback automatico, uninstall bit-a-bit,
     rilevamento dei file creati a runtime (`-PurgeNewFiles`).
 - Test automatici `tests/moduleA/Run-Tests.ps1` (15 casi, gioco finto in %TEMP%).
+### Fixed
+- Lettura della versione PE: ora ancorata alla chiave `VS_VERSION_INFO`. Prima una sequenza
+  `BD 04 EF FE` nel codice delle DLL NVIDIA restituiva versioni casuali (es. 46863.0.46863.4696).
 - Checklist di test manuale `docs/TEST-FASE2.md`.
 ### Added
 - Fase 0: ricognizione completa (`docs/RECON.md`), script di analisi in sola lettura (`tools/recon/`).

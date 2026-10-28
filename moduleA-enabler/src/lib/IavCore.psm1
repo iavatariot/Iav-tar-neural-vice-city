@@ -65,17 +65,28 @@ function Get-IavPeInfo {
     $arch = switch ($machine) { 0x8664 { 'x64' } 0x014C { 'x86' } 0xAA64 { 'arm64' } default { ('0x{0:X4}' -f $machine) } }
 
     $version = $null
-    # Ricerca della firma VS_FIXEDFILEINFO 0xFEEF04BD (little-endian BD 04 EF FE).
-    # [Array]::IndexOf e' nativo: necessario per DLL da 150+ MB.
+    # VS_FIXEDFILEINFO: si cerca la chiave UTF-16 "VS_VERSION_INFO" e, subito dopo, la firma 0xFEEF04BD
+    # con dwStrucVersion 0x00010000. Cercare la sola firma non basta: nei binari grandi (es. DLL NVIDIA)
+    # la sequenza BD 04 EF FE compare anche nel codice e restituirebbe versioni casuali.
+    $key = [Text.Encoding]::Unicode.GetBytes('VS_VERSION_INFO')
     $i = 0
     while ($true) {
-        $i = [Array]::IndexOf($bytes, [byte]0xBD, $i)
-        if ($i -lt 0 -or $i -gt $bytes.Length - 16) { break }
-        if ($bytes[$i + 1] -eq 0x04 -and $bytes[$i + 2] -eq 0xEF -and $bytes[$i + 3] -eq 0xFE) {
-            $ms = [BitConverter]::ToUInt32($bytes, $i + 8)
-            $ls = [BitConverter]::ToUInt32($bytes, $i + 12)
-            $version = New-Object Version ([int]($ms -shr 16)), ([int]($ms -band 0xFFFF)), ([int]($ls -shr 16)), ([int]($ls -band 0xFFFF))
-            break
+        $i = [Array]::IndexOf($bytes, [byte]0x56, $i)   # 'V'
+        if ($i -lt 0 -or $i -gt $bytes.Length - $key.Length - 64) { break }
+        $match = $true
+        for ($k = 1; $k -lt $key.Length; $k++) { if ($bytes[$i + $k] -ne $key[$k]) { $match = $false; break } }
+        if ($match) {
+            $limit = [Math]::Min($bytes.Length - 16, $i + 96)
+            for ($j = $i + $key.Length; $j -le $limit; $j++) {
+                if ($bytes[$j] -eq 0xBD -and $bytes[$j + 1] -eq 0x04 -and $bytes[$j + 2] -eq 0xEF -and $bytes[$j + 3] -eq 0xFE -and
+                    [BitConverter]::ToUInt32($bytes, $j + 4) -eq 0x00010000) {
+                    $ms = [BitConverter]::ToUInt32($bytes, $j + 8)
+                    $ls = [BitConverter]::ToUInt32($bytes, $j + 12)
+                    $version = New-Object Version ([int]($ms -shr 16)), ([int]($ms -band 0xFFFF)), ([int]($ls -shr 16)), ([int]($ls -band 0xFFFF))
+                    break
+                }
+            }
+            if ($version) { break }
         }
         $i++
     }

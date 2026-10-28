@@ -30,8 +30,14 @@ function New-FakePe {
     $buf[0x80] = 0x50; $buf[0x81] = 0x45
     $mc = $(if ($Machine -eq 'x64') { 0x8664 } else { 0x014C })
     [BitConverter]::GetBytes([uint16]$mc).CopyTo($buf, 0x84)
+    # esca: firma VS_FIXEDFILEINFO "nel codice" con versione sbagliata, senza chiave VS_VERSION_INFO
+    [BitConverter]::GetBytes([uint32]4277077181).CopyTo($buf, 0x100)
+    [BitConverter]::GetBytes([uint32]0x00010000).CopyTo($buf, 0x104)
+    [BitConverter]::GetBytes([uint32]3070164992).CopyTo($buf, 0x108)
+    $vk = [Text.Encoding]::Unicode.GetBytes('VS_VERSION_INFO'); $vk.CopyTo($buf, 0x1D0)
     $o = 0x200
     [BitConverter]::GetBytes([uint32]4277077181).CopyTo($buf, $o)
+    [BitConverter]::GetBytes([uint32]0x00010000).CopyTo($buf, $o + 4)
     [BitConverter]::GetBytes([uint32](($Version.Major -shl 16) -bor $Version.Minor)).CopyTo($buf, $o + 8)
     [BitConverter]::GetBytes([uint32](($Version.Build -shl 16) -bor $Version.Revision)).CopyTo($buf, $o + 12)
     $mk = [Text.Encoding]::Unicode.GetBytes($Marker)
@@ -101,7 +107,7 @@ It 'PE: legge architettura e FileVersion' {
     $f = New-Fixture; $fixtures.Add($f.Root)
     $pe = Get-IavPeInfo -Path (Join-Path $f.Inputs 'nvngx_dlssnr.dll')
     Assert-Eq $pe.Architecture 'x64' 'architettura'
-    Assert-Eq $pe.FileVersion.ToString() '310.8.0.0' 'versione'
+    Assert-Eq $pe.FileVersion.ToString() '310.8.0.0' 'versione (ignora la firma esca fuori da VS_VERSION_INFO)'
     Assert-True ($null -eq (Get-IavPeInfo -Path (Join-Path $f.Game 'Gameface\Binaries\Win64\steam_api64.dll'))) 'file non PE -> null'
 }
 
