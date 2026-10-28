@@ -12,12 +12,15 @@
       }
     ]
   },
-  "driver": { "minVersion": "610.47", "enforce": false },
+  "driver": {
+    "minVersion": "610.47",
+    "enforce": false
+  },
   "downloads": {
     "reshadeAddonSetup": {
       "url": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
       "officialPage": "https://reshade.me",
-      "sha256": null,
+      "sha256": "AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445",
       "innerFile": "ReShade64.dll"
     }
   },
@@ -29,7 +32,14 @@
       "allowRename": true,
       "pe": true,
       "minVersion": "6.8.0.0",
-      "productMarker": "ReShade"
+      "productMarker": "ReShade",
+      "referenceBuilds": [
+        {
+          "version": "6.8.0",
+          "source": "ReShade_Setup_6.8.0_Addon.exe (reshade.me), ReShade64.dll estratta",
+          "sha256": "0CEE63F9C9F13F3AC909C5B4903F4DBB4B719A7AB3B4F13B0DEAF83C814B94F7"
+        }
+      ]
     },
     "renodx": {
       "description": "Add-on DLSS 5 di RenoDX (.addon64)",
@@ -37,7 +47,10 @@
       "keepSourceName": true,
       "extension": ".addon64",
       "pe": true,
-      "allowedSha256": []
+      "allowedSha256": [
+        "79871879324053D49931A9F8C1865FCB83E8146DF4A56B146D7A8A14CC7E70FE"
+      ],
+      "notes": "renodx-dlss5.addon64 build 0.2026.1020.1459 (RenoDX Discord, 2026-10-28). Cerca nvngx_dlssnr.dll accanto all addon o all exe; build di riferimento 310.9.16."
     },
     "dlssnr": {
       "description": "NVIDIA DLSS Neural Rendering runtime (nvngx_dlssnr.dll, firmato NVIDIA)",
@@ -45,7 +58,14 @@
       "fileName": "nvngx_dlssnr.dll",
       "pe": true,
       "minVersion": "310.8.0.0",
-      "signer": "NVIDIA Corporation"
+      "signer": "NVIDIA Corporation",
+      "referenceBuilds": [
+        {
+          "version": "310.9.16.0",
+          "source": "RTX Remix 1.6.1 (NVIDIA app) deps\\remix_runtime\\runtime\\.trex",
+          "sha256": "2BC19BC09A7B89DD44F73E2AC0108FCC586E2154BDD0830F242F4F040E28789F"
+        }
+      ]
     },
     "dlsssr": {
       "description": "NVIDIA DLSS Super Resolution aggiornato (nvngx_dlss.dll, override NGX, opzionale)",
@@ -54,7 +74,14 @@
       "pe": true,
       "minVersion": "3.1.13.0",
       "signer": "NVIDIA Corporation",
-      "optional": true
+      "optional": true,
+      "referenceBuilds": [
+        {
+          "version": "310.9.1.0",
+          "source": "RTX Remix 1.6.1 (NVIDIA app) deps\\remix_runtime\\runtime\\.trex",
+          "sha256": "3975567B8943C53ACCE397F2B72380092F84F162D00B0D2C7D08A1025C563983"
+        }
+      ]
     },
     "preset": {
       "description": "Preset ReShade IAVAT@R",
