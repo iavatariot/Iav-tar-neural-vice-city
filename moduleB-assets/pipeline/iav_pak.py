@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import os
 import struct
 import sys
@@ -152,7 +153,7 @@ class PakReader:
             dname = d.fstring()
             for _ in range(d.u('i')):
                 fname = d.fstring()
-                self.index[dname + fname] = d.u('i')
+                self.index[(fname if dname == '/' else dname + fname)] = d.u('i')
 
     def _read(self, off: int, n: int) -> bytes:
         self.fh.seek(off)
@@ -232,121 +233,156 @@ def _fstring(s: str) -> bytes:
         return struct.pack('<i', -(len(b) // 2)) + b
 
 
-def write_pak(out_path: str, files: dict[str, bytes], mount: str = '../../../', compress: bool = True,
-              block_size: int = 0x10000, level: int = 9) -> dict:
-    """Scrive un pak v11 NON cifrato. `files`: percorso relativo al mount -> contenuto.
-    Con compress=True ogni voce e' compressa in blocchi Zlib da 64 KiB (offset relativi alla voce, v11);
-    se la compressione non conviene la voce resta non compressa. Indice: path hash index + full directory index."""
-    data = io.BytesIO()
-    encoded = io.BytesIO()
-    offsets: dict[str, int] = {}
-    stats = {'usize': 0, 'csize': 0}
-    for rel in sorted(files):
-        content = files[rel]
-        off = data.tell()
+def _encode_entry(rec: dict) -> bytes:
+    """Voce codificata come FPakFile::EncodePakEntry di UE 4.26 (block size in 6 bit, mai esplicito)."""
+    off, usize, csize, nblk = rec['off'], rec['usize'], rec['csize'], rec['nblk']
+    b = io.BytesIO()
+    if nblk:
+        bs_packed = ((rec['block_size'] if nblk > 1 else usize) >> 11) & 0x3F
+        flags = bs_packed | ((nblk & 0xFFFF) << 6) | (1 << 23)  # metodo 1 = slot 0 (Zlib)
+        flags |= (1 << 29) if csize <= 0xFFFFFFFF else 0
+    else:
+        flags = 0
+    flags |= (1 << 31) if off <= 0xFFFFFFFF else 0
+    flags |= (1 << 30) if usize <= 0xFFFFFFFF else 0
+    b.write(struct.pack('<I', flags))
+    b.write(struct.pack('<I' if off <= 0xFFFFFFFF else '<Q', off))
+    b.write(struct.pack('<I' if usize <= 0xFFFFFFFF else '<Q', usize))
+    if nblk:
+        b.write(struct.pack('<I' if csize <= 0xFFFFFFFF else '<Q', csize))
+        if nblk > 1:
+            for c in rec['chunks']:
+                b.write(struct.pack('<I', c))
+    return b.getvalue()
+
+
+class PakWriter:
+    """Scrittura di un pak v11 NON cifrato, in streaming e riprendibile.
+    I dati vanno in `<out>.part`; lo stato (voci gia' scritte) in `<out>.state.json`.
+    `finalize()` scrive path hash index, full directory index e footer, poi rinomina."""
+
+    def __init__(self, out_path: str, mount: str = '../../../', compress: bool = True,
+                 block_size: int = 0x10000, level: int = 6):
+        self.out_path, self.mount, self.compress = out_path, mount, compress
+        self.block_size, self.level = block_size, level
+        self.part = out_path + '.part'
+        self.state_path = out_path + '.state.json'
+        self.records: list[dict] = []
+        if os.path.exists(self.state_path) and os.path.exists(self.part):
+            st = json.load(open(self.state_path, encoding='utf-8'))
+            self.records = st['records']
+            with open(self.part, 'r+b') as fh:
+                fh.truncate(st['data_size'])
+        else:
+            open(self.part, 'wb').close()
+        self.done = {r['rel'] for r in self.records}
+        self.fh = open(self.part, 'ab')
+
+    def _save(self):
+        self.fh.flush()
+        tmp = self.state_path + '.tmp'
+        json.dump({'records': self.records, 'data_size': self.fh.tell()}, open(tmp, 'w', encoding='utf-8'))
+        os.replace(tmp, self.state_path)
+
+    def add(self, rel: str, content: bytes, save: bool = True):
+        if rel in self.done:
+            return
+        off = self.fh.tell()
         usize = len(content)
         chunks = []
-        if compress and usize > 0:
-            for i in range(0, usize, block_size):
-                chunks.append(zlib.compress(content[i:i + block_size], level))
+        if self.compress and usize > 0:
+            chunks = [zlib.compress(content[i:i + self.block_size], self.level) for i in range(0, usize, self.block_size)]
             if sum(len(c) for c in chunks) >= usize:
                 chunks = []
-        stats['usize'] += usize
         if chunks:
             nblk = len(chunks)
             hdr_size = _entry_header_size(True, nblk)
             csize = sum(len(c) for c in chunks)
-            blocks, pos = [], hdr_size
-            for c in chunks:
-                blocks.append((pos, pos + len(c)))
-                pos += len(c)
-            header = bytearray()
-            header += struct.pack('<qqqi', 0, csize, usize, 1)
+            header = bytearray(struct.pack('<qqqi', 0, csize, usize, 1))
             header += hashlib.sha1(b''.join(chunks)).digest()
             header += struct.pack('<i', nblk)
-            for b0, b1 in blocks:
-                header += struct.pack('<qq', b0, b1)
-            header += struct.pack('<BI', 0, block_size if nblk > 1 else usize)
-            assert len(header) == hdr_size
-            data.write(header)
+            pos = hdr_size
             for c in chunks:
-                data.write(c)
-            stats['csize'] += csize
-            # voce codificata come FPakFile::EncodePakEntry di UE 4.26: block size in 6 bit (>>11),
-            # mai un valore esplicito (il formato 4.26 non lo prevede: il motore lo leggerebbe come offset)
-            bs_packed = ((block_size if nblk > 1 else usize) >> 11) & 0x3F
-            flags = bs_packed | ((nblk & 0xFFFF) << 6) | (1 << 23)  # metodo 1 = slot 0 (Zlib)
-            flags |= (1 << 31) if off <= 0xFFFFFFFF else 0
-            flags |= (1 << 30) if usize <= 0xFFFFFFFF else 0
-            flags |= (1 << 29) if csize <= 0xFFFFFFFF else 0
-            enc_off = encoded.tell()
-            encoded.write(struct.pack('<I', flags))
-            encoded.write(struct.pack('<I' if off <= 0xFFFFFFFF else '<Q', off))
-            encoded.write(struct.pack('<I' if usize <= 0xFFFFFFFF else '<Q', usize))
-            encoded.write(struct.pack('<I' if csize <= 0xFFFFFFFF else '<Q', csize))
-            if nblk > 1:
-                for c in chunks:
-                    encoded.write(struct.pack('<I', len(c)))
+                header += struct.pack('<qq', pos, pos + len(c))
+                pos += len(c)
+            header += struct.pack('<BI', 0, self.block_size if nblk > 1 else usize)
+            self.fh.write(header)
+            for c in chunks:
+                self.fh.write(c)
+            rec = {'rel': rel, 'off': off, 'usize': usize, 'csize': csize, 'nblk': nblk,
+                   'block_size': self.block_size, 'chunks': [len(c) for c in chunks]}
         else:
-            data.write(struct.pack('<qqqi', 0, usize, usize, 0) + hashlib.sha1(content).digest() + struct.pack('<BI', 0, 0))
-            data.write(content)
-            stats['csize'] += usize
-            enc_off = encoded.tell()
-            flags = (1 << 31 if off <= 0xFFFFFFFF else 0) | (1 << 30 if usize <= 0xFFFFFFFF else 0)
-            encoded.write(struct.pack('<I', flags))
-            encoded.write(struct.pack('<I' if off <= 0xFFFFFFFF else '<Q', off))
-            encoded.write(struct.pack('<I' if usize <= 0xFFFFFFFF else '<Q', usize))
-        offsets[rel] = enc_off
-    # full directory index: radice "/" e ogni directory intermedia, come nei pak del gioco
-    dirs: dict[str, list] = {'/': []}
-    for rel in sorted(files):
-        d, f = rel.rsplit('/', 1) if '/' in rel else ('', rel)
-        parts = d.split('/') if d else []
-        for i in range(1, len(parts) + 1):
-            dirs.setdefault('/'.join(parts[:i]) + '/', [])
-        dirs[(d + '/') if d else '/'].append((f, offsets[rel]))
-    fdi = io.BytesIO()
-    fdi.write(struct.pack('<i', len(dirs)))
-    for dname in sorted(dirs):
-        fdi.write(_fstring(dname))
-        fdi.write(struct.pack('<i', len(dirs[dname])))
-        for fname, eo in dirs[dname]:
-            fdi.write(_fstring(fname) + struct.pack('<i', eo))
-    # path hash index: FNV-64 del percorso minuscolo in UTF-16LE, base FNV + seed (verificato su pakchunk1)
-    seed = zlib.crc32(os.path.basename(out_path).lower().encode('utf-16le')) & 0xFFFFFFFF
-    phi = io.BytesIO()
-    phi.write(struct.pack('<i', len(files)))
-    for rel in sorted(files):
-        phi.write(struct.pack('<Qi', path_hash(rel, seed), offsets[rel]))
-    phi.write(struct.pack('<i', 0))  # pruned directory index vuoto
-    data_bytes = data.getvalue()
-    fdi_bytes = fdi.getvalue()
-    phi_bytes = phi.getvalue()
-    enc_bytes = encoded.getvalue()
+            self.fh.write(struct.pack('<qqqi', 0, usize, usize, 0) + hashlib.sha1(content).digest() + struct.pack('<BI', 0, 0))
+            self.fh.write(content)
+            rec = {'rel': rel, 'off': off, 'usize': usize, 'csize': usize, 'nblk': 0, 'block_size': 0, 'chunks': []}
+        self.records.append(rec)
+        self.done.add(rel)
+        if save:
+            self._save()
 
-    index_off = len(data_bytes)
+    def finalize(self) -> dict:
+        self._save()
+        self.fh.close()
+        encoded = io.BytesIO()
+        offsets = {}
+        for rec in sorted(self.records, key=lambda r: r['rel']):
+            offsets[rec['rel']] = encoded.tell()
+            encoded.write(_encode_entry(rec))
+        rels = sorted(offsets)
+        dirs: dict[str, list] = {'/': []}
+        for rel in rels:
+            d, f = rel.rsplit('/', 1) if '/' in rel else ('', rel)
+            parts = d.split('/') if d else []
+            for i in range(1, len(parts) + 1):
+                dirs.setdefault('/'.join(parts[:i]) + '/', [])
+            dirs[(d + '/') if d else '/'].append((f, offsets[rel]))
+        fdi = io.BytesIO()
+        fdi.write(struct.pack('<i', len(dirs)))
+        for dname in sorted(dirs):
+            fdi.write(_fstring(dname))
+            fdi.write(struct.pack('<i', len(dirs[dname])))
+            for fname, eo in dirs[dname]:
+                fdi.write(_fstring(fname) + struct.pack('<i', eo))
+        # path hash index: FNV-64 del percorso minuscolo in UTF-16LE, base FNV + seed (verificato su pakchunk1)
+        seed = zlib.crc32(os.path.basename(self.out_path).lower().encode('utf-16le')) & 0xFFFFFFFF
+        phi = io.BytesIO()
+        phi.write(struct.pack('<i', len(rels)))
+        for rel in rels:
+            phi.write(struct.pack('<Qi', path_hash(rel, seed), offsets[rel]))
+        phi.write(struct.pack('<i', 0))  # pruned directory index vuoto
+        fdi_b, phi_b, enc_b = fdi.getvalue(), phi.getvalue(), encoded.getvalue()
+        index_off = os.path.getsize(self.part)
 
-    def primary(phi_off: int, fdi_off: int) -> bytes:
-        b = io.BytesIO()
-        b.write(_fstring(mount))
-        b.write(struct.pack('<iQ', len(files), seed))
-        b.write(struct.pack('<Iqq', 1, phi_off, len(phi_bytes)) + hashlib.sha1(phi_bytes).digest())
-        b.write(struct.pack('<Iqq', 1, fdi_off, len(fdi_bytes)) + hashlib.sha1(fdi_bytes).digest())
-        b.write(struct.pack('<i', len(enc_bytes)) + enc_bytes)
-        b.write(struct.pack('<i', 0))
-        return b.getvalue()
-    plen = len(primary(0, 0))
-    phi_off = index_off + plen
-    fdi_off = phi_off + len(phi_bytes)
-    p = primary(phi_off, fdi_off)
-    assert len(p) == plen
-    footer = (b'\0' * 16 + b'\0' + struct.pack('<IIQQ', PAK_MAGIC, PAK_VERSION, index_off, len(p))
-              + hashlib.sha1(p).digest() + b'Zlib'.ljust(32, b'\0') + b'\0' * (32 * (COMPRESSION_SLOTS - 1)))
-    assert len(footer) == FOOTER_SIZE
-    with open(out_path, 'wb') as fh:
-        fh.write(data_bytes)
-        fh.write(p)
-        fh.write(phi_bytes)
-        fh.write(fdi_bytes)
-        fh.write(footer)
-    return {'files': len(files), 'bytes': os.path.getsize(out_path), 'usize': stats['usize'], 'csize': stats['csize']}
+        def primary(phi_off: int, fdi_off: int) -> bytes:
+            b = io.BytesIO()
+            b.write(_fstring(self.mount))
+            b.write(struct.pack('<iQ', len(rels), seed))
+            b.write(struct.pack('<Iqq', 1, phi_off, len(phi_b)) + hashlib.sha1(phi_b).digest())
+            b.write(struct.pack('<Iqq', 1, fdi_off, len(fdi_b)) + hashlib.sha1(fdi_b).digest())
+            b.write(struct.pack('<i', len(enc_b)) + enc_b)
+            b.write(struct.pack('<i', 0))
+            return b.getvalue()
+        plen = len(primary(0, 0))
+        p = primary(index_off + plen, index_off + plen + len(phi_b))
+        names = (b'Zlib'.ljust(32, b'\0') if any(r['nblk'] for r in self.records) else b'\0' * 32) + b'\0' * (32 * (COMPRESSION_SLOTS - 1))
+        footer = (b'\0' * 16 + b'\0' + struct.pack('<IIQQ', PAK_MAGIC, PAK_VERSION, index_off, len(p))
+                  + hashlib.sha1(p).digest() + names)
+        assert len(footer) == FOOTER_SIZE
+        with open(self.part, 'ab') as fh:
+            fh.write(p); fh.write(phi_b); fh.write(fdi_b); fh.write(footer)
+        os.replace(self.part, self.out_path)
+        os.remove(self.state_path)
+        return {'files': len(rels), 'bytes': os.path.getsize(self.out_path),
+                'usize': sum(r['usize'] for r in self.records), 'csize': sum(r['csize'] for r in self.records)}
+
+
+def write_pak(out_path: str, files: dict[str, bytes], mount: str = '../../../', compress: bool = True,
+              block_size: int = 0x10000, level: int = 6) -> dict:
+    """Scrive un pak completo in un colpo solo (per test e pak piccoli)."""
+    for f in (out_path + '.part', out_path + '.state.json'):
+        if os.path.exists(f):
+            os.remove(f)
+    w = PakWriter(out_path, mount, compress, block_size, level)
+    for rel in sorted(files):
+        w.add(rel, files[rel], save=False)
+    return w.finalize()

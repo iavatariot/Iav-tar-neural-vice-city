@@ -1,0 +1,12 @@
+{
+  "name": "environment-v1",
+  "description": "Ambiente: superfici (strade, marciapiedi, muri, edifici, props) con micro-rilievo nelle normal map ricavato dall'albedo e nitidezza fine. Solo materiali ambiente standard, texture >= 256 px. Pak separato.",
+  "pak_name": "IAVATAR_NeuralViceCity_Environment_P.pak",
+  "rules": [
+    {"manifest": "environment.json",
+     "parents": ["MI_Env_P_Base", "MI_Env_Masked_P_Base", "MI_Env_Base"],
+     "min_size": 256,
+     "basecolor_ops": [{"op": "unsharp", "radius": 1.2, "percent": 45, "threshold": 3}],
+     "normal_ops": [{"op": "normal_detail", "albedo_strength": 0.7, "albedo_radius": 2.5, "pore_strength": 0.0, "bump": 4.0, "seed": 1986}]}
+  ]
+}

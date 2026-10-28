@@ -24,3 +24,4 @@ __pycache__/
 *.pyc
 # Manifest generati da discover.py (elenchi di asset del gioco): si rigenerano, non si versionano
 moduleB-assets/assets-manifest/characters.json
+moduleB-assets/assets-manifest/environment.json

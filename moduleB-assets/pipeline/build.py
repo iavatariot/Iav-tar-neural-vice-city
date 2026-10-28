@@ -23,6 +23,7 @@ import iav_pak  # noqa: E402
 import iav_texture as T  # noqa: E402
 
 ENCODE = {'PF_DXT1': 'DXT1', 'PF_DXT5': 'DXT5', 'PF_BC5': 'BC5'}
+MIN_EFFECTIVE = 64
 
 
 def encode_mip(img: Image.Image, fmt: str, expected: int) -> bytes:
@@ -61,7 +62,7 @@ def op_unsharp(img, p, ctx):
 
 def _decode_asset_image(asset, src):
     ue, ub = src.get(asset + '.uexp'), src.get(asset + '.ubulk')
-    im = Image.open(io.BytesIO(T.to_dds(T.parse(ue), ue, ub)))
+    im = Image.open(io.BytesIO(T.to_dds(T.effective(T.parse(ue)), ue, ub)))
     im.load()
     return im
 
@@ -131,7 +132,9 @@ def expand_rules(recipe, manifest_dir):
             bc, nm = s_.get('basecolor', ''), s_.get('normal', '')
             if not bc.startswith('Gameface/Content/ViceCity/'):
                 continue
-            fmt_ok = lambda t: man['texture_info'].get(t, {}).get('format') in ENCODE  # noqa: E731
+            min_size = rule.get('min_size', 0)
+            fmt_ok = lambda t: (man['texture_info'].get(t, {}).get('format') in ENCODE  # noqa: E731
+                                and (man['texture_info'].get(t, {}).get('size') or 0) >= min_size)
             if rule.get('basecolor_ops') and bc not in seen and fmt_ok(bc):
                 items.append({'asset': bc, 'ops': rule['basecolor_ops']}); seen.add(bc)
             if rule.get('normal_ops') and nm.startswith('Gameface/Content/ViceCity/') and nm not in seen and fmt_ok(nm):
@@ -144,9 +147,9 @@ def process_texture(asset: str, ops: list, src):
     ue, ub = src.get(asset + '.uexp'), src.get(asset + '.ubulk')
     if ue is None:
         raise FileNotFoundError(asset)
-    info = T.parse(ue)
-    if not info.mips or info.mips[0].width != info.width:
-        raise ValueError(f'texture ridotta in cottura (mip 0 = {info.mips[0].width if info.mips else 0}px su {info.width}px): saltata')
+    info = T.effective(T.parse(ue))
+    if not info.mips or info.width < MIN_EFFECTIVE:
+        raise ValueError(f'texture troppo piccola o ridotta in cottura (mip 0 = {info.width}px): saltata')
     if info.pixel_format not in ENCODE:
         raise ValueError(f'{asset}: formato {info.pixel_format} non ancora supportato in scrittura')
     img = Image.open(io.BytesIO(T.to_dds(info, ue, ub)))
@@ -176,8 +179,10 @@ def main() -> int:
     ap.add_argument('--out', required=True)
     ap.add_argument('--no-compress', action='store_true')
     ap.add_argument('--previews', type=int, default=6, help='quante anteprime PNG salvare')
-    ap.add_argument('--time-budget', type=float, default=1e9, help='secondi massimi di lavorazione per esecuzione')
+    ap.add_argument('--time-budget', type=float, default=1e9,
+                    help='secondi massimi per esecuzione: oltre, salva e termina con codice 3 (rilanciare per continuare)')
     ap.add_argument('--no-pak', action='store_true', help='lavora le texture senza scrivere il pak')
+    ap.add_argument('--verify-sample', type=int, default=64, help='quanti file del pak rileggere e confrontare')
     a = ap.parse_args()
     if not (a.extract or a.game):
         ap.error('serve --extract oppure --game')
@@ -185,62 +190,76 @@ def main() -> int:
     src = Source(a.extract, a.game)
     items = list(recipe.get('textures', [])) + expand_rules(recipe, os.path.join(os.path.dirname(os.path.abspath(a.recipe)), '..', 'assets-manifest'))
     os.makedirs(a.out, exist_ok=True)
-    files = {}
+    t0 = time.time()
+    over = lambda: time.time() - t0 > a.time_budget  # noqa: E731
+    files: dict[str, str] = {}          # percorso nel pak -> file in cache (mai tutto in memoria)
     report = {'recipe': recipe['name'], 'assets': [], 'skipped': []}
-    t0, pending = time.time(), 0
+    pending = 0
+    # ---------------------------------------------------------------- 1. lavorazione (con cache)
     for n, item in enumerate(items, 1):
         key = hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()[:16]
         cdir = os.path.join(a.out, 'cache', key)
-        if os.path.isfile(os.path.join(cdir, 'done.json')):
-            meta = json.load(open(os.path.join(cdir, 'done.json'), encoding='utf-8'))
-            if meta.get('skipped'):
-                report['skipped'].append({'asset': item['asset'], 'reason': meta['skipped']})
+        done = os.path.join(cdir, 'done.json')
+        if not os.path.isfile(done):
+            if over():
+                pending += 1
                 continue
-            for rel in meta['files']:
-                files[rel] = open(os.path.join(cdir, os.path.basename(rel)), 'rb').read()
-            report['assets'].append(meta['info'])
+            try:
+                out, info = process_texture(item['asset'], item['ops'], src)
+            except (ValueError, FileNotFoundError, OSError) as e:
+                print(f"[SALTATO] {item['asset']}: {e}")
+                os.makedirs(cdir, exist_ok=True)
+                json.dump({'skipped': str(e)}, open(done, 'w', encoding='utf-8'))
+            else:
+                os.makedirs(cdir, exist_ok=True)
+                for rel, data in out.items():
+                    open(os.path.join(cdir, os.path.basename(rel)), 'wb').write(data)
+                meta_info = {'asset': item['asset'], 'format': info.pixel_format, 'size': [info.width, info.height], 'mips': info.num_mips}
+                json.dump({'files': sorted(out), 'info': meta_info}, open(done, 'w', encoding='utf-8'))
+                print(f"[{n}/{len(items)}] {item['asset']}  {info.pixel_format} {info.width}x{info.height}")
+                if n <= a.previews:
+                    ue = out[item['asset'] + '.uexp']
+                    Image.open(io.BytesIO(T.to_dds(T.effective(T.parse(ue)), ue, out.get(item['asset'] + '.ubulk')))) \
+                        .convert('RGB').resize((512, 512)).save(os.path.join(a.out, os.path.basename(item['asset']) + '_preview.png'))
+        meta = json.load(open(done, encoding='utf-8'))
+        if meta.get('skipped'):
+            report['skipped'].append({'asset': item['asset'], 'reason': meta['skipped']})
             continue
-        if time.time() - t0 > a.time_budget:
-            pending += 1
-            continue
-        try:
-            out, info = process_texture(item['asset'], item['ops'], src)
-        except (ValueError, FileNotFoundError, OSError) as e:
-            report['skipped'].append({'asset': item['asset'], 'reason': str(e)})
-            print(f"[SALTATO] {item['asset']}: {e}")
-            os.makedirs(cdir, exist_ok=True)
-            json.dump({'skipped': str(e)}, open(os.path.join(cdir, 'done.json'), 'w', encoding='utf-8'))
-            continue
-        files.update(out)
-        meta_info = {'asset': item['asset'], 'format': info.pixel_format, 'size': [info.width, info.height], 'mips': info.num_mips}
-        report['assets'].append(meta_info)
-        os.makedirs(cdir, exist_ok=True)
-        for rel, data in out.items():
-            open(os.path.join(cdir, os.path.basename(rel)), 'wb').write(data)
-        json.dump({'files': sorted(out), 'info': meta_info}, open(os.path.join(cdir, 'done.json'), 'w', encoding='utf-8'))
-        print(f"[{n}/{len(items)}] {item['asset']}  {info.pixel_format} {info.width}x{info.height}")
-        if n <= a.previews:
-            prev = os.path.join(a.out, os.path.basename(item['asset']) + '_preview.png')
-            ue = out[item['asset'] + '.uexp']
-            Image.open(io.BytesIO(T.to_dds(T.parse(ue), ue, out.get(item['asset'] + '.ubulk')))).convert('RGB').resize((512, 512)).save(prev)
+        for rel in meta['files']:
+            files[rel] = os.path.join(cdir, os.path.basename(rel))
+        report['assets'].append(meta['info'])
     if pending:
-        print(f'[PARZIALE] {pending} texture ancora da lavorare: rilancia lo stesso comando (riprende dalla cache).')
+        print(f'[PARZIALE] lavorazione: {pending} texture ancora da fare. Rilancia lo stesso comando.')
         return 3
+    print(f"[OK] lavorazione completa: {len(report['assets'])} texture, {len(report['skipped'])} saltate")
     if a.no_pak:
-        print('[OK] tutte le texture lavorate; pak non scritto (--no-pak).')
         return 0
+    # ---------------------------------------------------------------- 2. pak (streaming, riprendibile)
     pak_path = os.path.join(a.out, recipe.get('pak_name', 'IAVATAR_NeuralViceCity_P.pak'))
-    info = iav_pak.write_pak(pak_path, files, mount='../../../', compress=not a.no_compress)
+    w = iav_pak.PakWriter(pak_path, '../../../', compress=not a.no_compress)
+    todo = [r for r in sorted(files) if r not in w.done]
+    for k, rel in enumerate(todo):
+        if over():
+            w._save()
+            print(f'[PARZIALE] pak: {len(w.done)}/{len(files)} file scritti. Rilancia lo stesso comando.')
+            return 3
+        w.add(rel, open(files[rel], 'rb').read(), save=(k % 25 == 0))
+    info = w.finalize()
+    # ---------------------------------------------------------------- 3. verifica a campione
     rd = iav_pak.PakReader(pak_path)
-    for rel, data in files.items():
-        if rd.read(rel) != data:
+    if set(rd.index) != set(files):
+        raise IOError('indice del pak diverso dai file attesi')
+    import random
+    sample = random.Random(1986).sample(sorted(files), min(a.verify_sample, len(files)))
+    for rel in sample:
+        if rd.read(rel) != open(files[rel], 'rb').read():
             raise IOError('verifica pak fallita su ' + rel)
-    report['pak'] = {'path': pak_path, 'files': len(files), 'bytes': info['bytes'],
-                     'usize': info['usize'], 'csize': info['csize'],
-                     'sha256': hashlib.sha256(open(pak_path, 'rb').read()).hexdigest()}
+    report['pak'] = {'path': pak_path, 'files': info['files'], 'bytes': info['bytes'],
+                     'usize': info['usize'], 'csize': info['csize'], 'verified_sample': len(sample)}
     json.dump(report, open(os.path.join(a.out, 'build-report.json'), 'w', encoding='utf-8'), indent=2)
     print(f"[OK] pak {pak_path}: {len(report['assets'])} texture, {info['files']} file, "
-          f"{info['bytes'] / 2**20:.1f} MB (non compresso {info['usize'] / 2**20:.1f} MB), riletto e verificato")
+          f"{info['bytes'] / 2**20:.1f} MB (non compresso {info['usize'] / 2**20:.1f} MB); indice completo, "
+          f"{len(sample)} file riletti e identici")
     return 0
 
 

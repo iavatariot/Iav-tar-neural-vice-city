@@ -1,0 +1,19 @@
+{
+  "name": "characters-v3",
+  "description": "Personaggi: pelle (come skin-realism-v2), vestiti (trama del tessuto) e capelli (ciocche). Stessa risoluzione/formato/mip. Pak separato per i personaggi.",
+  "pak_name": "IAVATAR_NeuralViceCity_Characters_P.pak",
+  "rules": [
+    {"manifest": "characters.json",
+     "parents": ["MI_Character_White_SkinOnly_P_Base", "MI_Character_White_P_Base", "MI_Pedestrian_P_Base"],
+     "basecolor_ops": [{"op": "unsharp", "radius": 1.6, "percent": 60, "threshold": 2}],
+     "normal_ops": [{"op": "normal_detail", "albedo_strength": 1.0, "albedo_radius": 3.0, "pore_strength": 0.02, "bump": 6.0, "seed": 1986}]},
+    {"manifest": "characters.json",
+     "parents": ["MI_Character_Clothes_P_Base"],
+     "basecolor_ops": [{"op": "unsharp", "radius": 1.2, "percent": 50, "threshold": 2}],
+     "normal_ops": [{"op": "normal_detail", "albedo_strength": 0.8, "albedo_radius": 2.0, "pore_strength": 0.01, "bump": 5.0, "seed": 1986}]},
+    {"manifest": "characters.json",
+     "parents": ["MI_Character_Hair_P_Base"],
+     "basecolor_ops": [{"op": "unsharp", "radius": 1.0, "percent": 40, "threshold": 3}],
+     "normal_ops": [{"op": "normal_detail", "albedo_strength": 1.2, "albedo_radius": 2.0, "pore_strength": 0.0, "bump": 4.0, "seed": 1986}]}
+  ]
+}

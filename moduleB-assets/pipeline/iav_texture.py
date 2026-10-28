@@ -112,3 +112,11 @@ def inject(info: TextureInfo, uexp: bytes, ubulk: bytes | None, new_mips: list[b
         else:
             ue[m.inline_pos:m.inline_pos + m.size] = data
     return bytes(ue), (bytes(ub) if ub is not None else None)
+
+
+def effective(info: TextureInfo) -> TextureInfo:
+    """Vista della texture a partire dal primo mip realmente presente (texture ridotte in cottura)."""
+    if not info.mips or info.mips[0].width == info.width:
+        return info
+    m0 = info.mips[0]
+    return TextureInfo(info.pixel_format, m0.width, m0.height, len(info.mips), 0, info.mips)
