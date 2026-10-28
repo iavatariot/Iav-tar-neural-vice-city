@@ -7,7 +7,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [
 - Pipeline texture senza editor: estrazione selettiva (Oodle), parser Texture2D cotte, ricodifica
   in-place stesso formato/risoluzione/mip, writer pak v11 con path hash index verificato.
 - Lettura parametri dei MaterialInstance (formato binario di questa build).
-- Ricetta smoke test su Tommy.
+- Ricetta smoke test su Tommy (validata in gioco: pak caricato da ~mods).
+- `discover.py`: manifest automatico dei 519 MaterialInstance dei personaggi.
+- Ricetta `skin-realism-v2`: pelle di Tommy e di tutti i pedoni (330 texture), pak Zlib da 840 MB.
 ### Changed
 - Preset ufficiale "IAVATAR" in `presets/ReShade.ini`, tarato in gioco: 1 passata, stile naturale,
   maschera personaggi, stabilizzazione del look (~3,5 ms GPU a 1080p su RTX 5060 Ti).

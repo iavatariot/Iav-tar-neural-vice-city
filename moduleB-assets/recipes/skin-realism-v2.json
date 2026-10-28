@@ -1,0 +1,11 @@
+{
+  "name": "skin-realism-v2",
+  "description": "Pelle di tutti i personaggi (Tommy + pedoni): micro-dettaglio nelle normal map e nitidezza fine sull'albedo, stessa risoluzione/formato/mip. Generata dalle regole sui MaterialInstance con parent 'pelle'.",
+  "pak_name": "IAVATAR_NeuralViceCity_P.pak",
+  "rules": [
+    {"manifest": "characters.json",
+     "parents": ["MI_Character_White_SkinOnly_P_Base", "MI_Character_White_P_Base", "MI_Pedestrian_P_Base"],
+     "basecolor_ops": [{"op": "unsharp", "radius": 1.6, "percent": 60, "threshold": 2}],
+     "normal_ops": [{"op": "normal_detail", "albedo_strength": 1.0, "albedo_radius": 3.0, "pore_strength": 0.02, "bump": 6.0, "seed": 1986}]}
+  ]
+}

@@ -22,3 +22,5 @@ moduleB-assets/ue-cook-project/**/Binaries/
 work/
 __pycache__/
 *.pyc
+# Manifest generati da discover.py (elenchi di asset del gioco): si rigenerano, non si versionano
+moduleB-assets/assets-manifest/characters.json

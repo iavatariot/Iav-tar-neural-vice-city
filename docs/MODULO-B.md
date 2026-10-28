@@ -32,3 +32,14 @@ successiva, da valutare dopo il pilota.
 ## Ricette
 - `recipes/smoketest-tommy.json`: tinta blu evidente sulla BaseColor. Serve SOLO a verificare che il gioco
   carichi il pak da `~mods` e che quella texture sia quella visibile. Va rimossa subito dopo il test.
+
+## skin-realism-v2 (2026-10-28)
+- `discover.py` legge tutti i 519 MaterialInstance dei personaggi: 948 texture uniche
+  (parent piu' frequenti: Clothes 176, SkinOnly 152, Hair 92). Manifest: `assets-manifest/characters.json`.
+- La ricetta `skin-realism-v2` usa **regole per ruolo** (BaseColor / Normal) sui MI con parent "pelle":
+  346 texture candidate, 330 lavorate, 16 saltate perche' ridotte in cottura (mip 0 a 1024 o 8 px).
+- `build.py` legge direttamente dal pak del gioco (`--game`), ha una cache per texture e un budget di
+  tempo (`--time-budget`): si rilancia finche' non finisce. Pak compresso Zlib (blocchi da 64 KiB).
+- Pak risultante: 840 MB (1,2 GB non compresso).
+- Il preset di Tommy usa i MI in `Characters/Tommy/export_01` (letti da `SK_player`), non le copie in
+  `Peds`/`Textures/Character`.

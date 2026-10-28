@@ -1,0 +1,17 @@
+{
+  "name": "skin-realism-v1",
+  "description": "Pelle di Tommy: micro-dettaglio (pori, grana) nelle normal map BC5 e nitidezza fine sull'albedo. Stessa risoluzione/formato/mip degli originali. Pensato per dare al neural rendering piu' struttura su cui lavorare.",
+  "pak_name": "IAVATAR_NeuralViceCity_P.pak",
+  "textures": [
+    {"asset": "Gameface/Content/ViceCity/Characters/Tommy/export_01/T_CSplaySkin_N",
+     "ops": [{"op": "normal_detail", "albedo": "Gameface/Content/ViceCity/Characters/Tommy/export_01/T_CSplaySkin_BC",
+              "albedo_strength": 1.0, "albedo_radius": 3.0, "pore_strength": 0.02, "bump": 6.0, "seed": 1986}]},
+    {"asset": "Gameface/Content/ViceCity/Characters/Tommy/export_01/T_CStommy_Skin2_N",
+     "ops": [{"op": "normal_detail", "albedo": "Gameface/Content/ViceCity/Characters/Tommy/export_01/T_CStommy_Skin2_BC",
+              "albedo_strength": 1.0, "albedo_radius": 3.0, "pore_strength": 0.02, "bump": 6.0, "seed": 1986}]},
+    {"asset": "Gameface/Content/ViceCity/Characters/Tommy/export_01/T_CSplaySkin_BC",
+     "ops": [{"op": "unsharp", "radius": 1.6, "percent": 60, "threshold": 2}]},
+    {"asset": "Gameface/Content/ViceCity/Characters/Tommy/export_01/T_CStommy_Skin2_BC",
+     "ops": [{"op": "unsharp", "radius": 1.6, "percent": 60, "threshold": 2}]}
+  ]
+}
