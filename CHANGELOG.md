@@ -3,6 +3,11 @@
 Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [SemVer](https://semver.org/lang/it/).
 
 ## [Unreleased]
+### Added (Modulo B)
+- Pipeline texture senza editor: estrazione selettiva (Oodle), parser Texture2D cotte, ricodifica
+  in-place stesso formato/risoluzione/mip, writer pak v11 con path hash index verificato.
+- Lettura parametri dei MaterialInstance (formato binario di questa build).
+- Ricetta smoke test su Tommy.
 ### Changed
 - Preset ufficiale "IAVATAR" in `presets/ReShade.ini`, tarato in gioco: 1 passata, stile naturale,
   maschera personaggi, stabilizzazione del look (~3,5 ms GPU a 1080p su RTX 5060 Ti).

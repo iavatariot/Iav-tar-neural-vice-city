@@ -1,0 +1,11 @@
+{
+  "name": "pilot-tommy",
+  "description": "Pilota Fase 3: pelle di Tommy Vercetti in gioco (MI_tommy_skin -> T_CSplaySkin_BC/_N, T_tommy_skin_P). Solo texture, stessa risoluzione e formato.",
+  "source_pak": "Gameface/Content/Paks/pakchunk0-WindowsNoEditor.pak",
+  "assets": [
+    "Gameface/Content/ViceCity/Textures/Character/T_CSplaySkin_BC",
+    "Gameface/Content/ViceCity/Textures/Character/T_CSplaySkin_N",
+    "Gameface/Content/ViceCity/Textures/Character/T_tommy_skin_P",
+    "Gameface/Content/ViceCity/Characters/Peds/MI_tommy_skin"
+  ]
+}

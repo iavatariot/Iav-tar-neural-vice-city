@@ -20,3 +20,5 @@ moduleB-assets/ue-cook-project/**/Saved/
 moduleB-assets/ue-cook-project/**/DerivedDataCache/
 moduleB-assets/ue-cook-project/**/Binaries/
 work/
+__pycache__/
+*.pyc

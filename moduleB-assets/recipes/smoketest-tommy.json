@@ -1,0 +1,9 @@
+{
+  "name": "smoketest-tommy",
+  "description": "SOLO TEST: pelle di Tommy tinta di blu per verificare che il gioco carichi il pak in ~mods e quale texture e' visibile (BaseColor). Da rimuovere subito dopo.",
+  "pak_name": "IAVATAR_NeuralViceCity_P.pak",
+  "textures": [
+    {"asset": "Gameface/Content/ViceCity/Textures/Character/T_CSplaySkin_BC",
+     "ops": [{"op": "hue_tint", "color": [90, 160, 255], "amount": 0.85}]}
+  ]
+}
