@@ -164,14 +164,15 @@ class PakReader:
         eo = self.index[rel]
         r = _R(self._enc, eo)
         v = r.u('I')
-        bs = v & 0x3F
-        bs = r.u('I') if bs == 0x3F else bs << 11
+        packed_bs = v & 0x3F
         nblk = (v >> 6) & 0xFFFF
         enc = bool((v >> 22) & 1)
         cm = (v >> 23) & 0x3F
         off = r.u('I') if v & (1 << 31) else r.u('Q')
         usz = r.u('I') if v & (1 << 30) else r.u('Q')
         csz = (r.u('I') if v & (1 << 29) else r.u('Q')) if cm else usz
+        # UE 4.26: nessun block size esplicito; se la voce e' < 64 KiB il blocco e' l'intera voce
+        bs = (usz if usz < 65536 else packed_bs << 11) if nblk else 0
         e = PakEntry(rel, off, usz, csz, self.methods[cm - 1] if cm else 'None', enc, bs)
         if cm:
             hs = _entry_header_size(True, nblk)
@@ -232,7 +233,7 @@ def _fstring(s: str) -> bytes:
 
 
 def write_pak(out_path: str, files: dict[str, bytes], mount: str = '../../../', compress: bool = True,
-              block_size: int = 0x10000, level: int = 6) -> dict:
+              block_size: int = 0x10000, level: int = 9) -> dict:
     """Scrive un pak v11 NON cifrato. `files`: percorso relativo al mount -> contenuto.
     Con compress=True ogni voce e' compressa in blocchi Zlib da 64 KiB (offset relativi alla voce, v11);
     se la compressione non conviene la voce resta non compressa. Indice: path hash index + full directory index."""
@@ -271,18 +272,15 @@ def write_pak(out_path: str, files: dict[str, bytes], mount: str = '../../../', 
             for c in chunks:
                 data.write(c)
             stats['csize'] += csize
-            # voce codificata (FPakFile::EncodePakEntry)
-            bs_packed = (block_size >> 11) if nblk > 1 else ((usize >> 11) if (usize >> 11) << 11 == usize else 0x3F)
-            if (bs_packed << 11) != (block_size if nblk > 1 else usize):
-                bs_packed = 0x3F
-            flags = (bs_packed & 0x3F) | ((nblk & 0xFFFF) << 6) | (1 << 23)  # metodo 1 = slot 0 (Zlib)
+            # voce codificata come FPakFile::EncodePakEntry di UE 4.26: block size in 6 bit (>>11),
+            # mai un valore esplicito (il formato 4.26 non lo prevede: il motore lo leggerebbe come offset)
+            bs_packed = ((block_size if nblk > 1 else usize) >> 11) & 0x3F
+            flags = bs_packed | ((nblk & 0xFFFF) << 6) | (1 << 23)  # metodo 1 = slot 0 (Zlib)
             flags |= (1 << 31) if off <= 0xFFFFFFFF else 0
             flags |= (1 << 30) if usize <= 0xFFFFFFFF else 0
             flags |= (1 << 29) if csize <= 0xFFFFFFFF else 0
             enc_off = encoded.tell()
             encoded.write(struct.pack('<I', flags))
-            if bs_packed == 0x3F:
-                encoded.write(struct.pack('<I', block_size if nblk > 1 else usize))
             encoded.write(struct.pack('<I' if off <= 0xFFFFFFFF else '<Q', off))
             encoded.write(struct.pack('<I' if usize <= 0xFFFFFFFF else '<Q', usize))
             encoded.write(struct.pack('<I' if csize <= 0xFFFFFFFF else '<Q', csize))

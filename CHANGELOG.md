@@ -26,6 +26,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [
     rilevamento dei file creati a runtime (`-PurgeNewFiles`).
 - Test automatici `tests/moduleA/Run-Tests.ps1` (15 casi, gioco finto in %TEMP%).
 ### Fixed
+- Pak compressi: rimosso il block size esplicito (0x3F + uint32) nelle voci codificate. UE 4.26 non lo
+  prevede e lo interpretava come offset, causando il crash del gioco al caricamento delle texture.
+  Il lettore ora segue esattamente `FPakFile::DecodePakEntry` di 4.26.
 - Lettura della versione PE: ora ancorata alla chiave `VS_VERSION_INFO`. Prima una sequenza
   `BD 04 EF FE` nel codice delle DLL NVIDIA restituiva versioni casuali (es. 46863.0.46863.4696).
 - Checklist di test manuale `docs/TEST-FASE2.md`.
