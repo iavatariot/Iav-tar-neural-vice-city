@@ -1,0 +1,33 @@
+{
+"file": "pakchunk1-WindowsNoEditor.pak",
+"version": 11,
+"encryptedIndex": 0,
+"mount": "../../../Gameface/Content/",
+"entries": 263,
+"listed": 263,
+"nonEncodedFiles": 0,
+"encryptedEntries": 0,
+"compression": {
+"Oodle": 243,
+"Zlib": 20
+},
+"uncompressedGB": 0.05,
+"topExt": [
+[
+".uasset",
+124
+],
+[
+".uexp",
+124
+],
+[
+".ufont",
+14
+],
+[
+".ubulk",
+1
+]
+]
+}

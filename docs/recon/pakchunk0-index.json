@@ -1,0 +1,66 @@
+{
+"file": "pakchunk0-WindowsNoEditor.pak",
+"version": 11,
+"encryptedIndex": 0,
+"mount": "../../../",
+"entries": 108492,
+"listed": 108492,
+"nonEncodedFiles": 0,
+"encryptedEntries": 0,
+"compression": {
+"Zlib": 4145,
+"Oodle": 92911,
+"None": 11436
+},
+"uncompressedGB": 17.78,
+"topExt": [
+[
+".uexp",
+44069
+],
+[
+".uasset",
+44017
+],
+[
+".ubulk",
+16190
+],
+[
+".res",
+3438
+],
+[
+".png",
+282
+],
+[
+".dat",
+105
+],
+[
+".locres",
+66
+],
+[
+".uplugin",
+56
+],
+[
+".umap",
+52
+],
+[
+".col",
+34
+],
+[
+".ide",
+33
+],
+[
+".ipl",
+33
+]
+]
+}

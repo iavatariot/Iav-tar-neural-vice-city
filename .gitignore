@@ -1,0 +1,22 @@
+# Mai versionare file del gioco o derivati
+docs/recon/*-filelist.txt
+staging/
+extract/
+cook/
+*.pak
+*.uasset
+*.uexp
+*.ubulk
+*.dll
+docs/recon/runtime-*.txt
+backups/
+logs/
+dist/
+*.zip
+*.7z
+# Progetto UE di cook: solo sorgenti, mai cache e output
+moduleB-assets/ue-cook-project/**/Intermediate/
+moduleB-assets/ue-cook-project/**/Saved/
+moduleB-assets/ue-cook-project/**/DerivedDataCache/
+moduleB-assets/ue-cook-project/**/Binaries/
+work/

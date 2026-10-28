@@ -1,0 +1,74 @@
+{
+  "product": "IAVAT@R Neural Vice City",
+  "version": "0.1.0",
+  "game": {
+    "appId": "1546990",
+    "testedBuilds": [
+      {
+        "buildId": "16390876",
+        "exeVersion": "1.0.113.21181",
+        "exeSha256": "114C68D602C97062A44136D9987C2F23DEDBC4D657850288A1CA5BF1639CA6F0",
+        "nativeDlssSha256": "1782B605A2C9B3E8A97BA3877F4EA8505B147B83053C42B6917A16D24BC22A5C"
+      }
+    ]
+  },
+  "driver": { "minVersion": "610.47", "enforce": false },
+  "downloads": {
+    "reshadeAddonSetup": {
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
+      "officialPage": "https://reshade.me",
+      "sha256": null,
+      "innerFile": "ReShade64.dll"
+    }
+  },
+  "components": {
+    "reshade": {
+      "description": "ReShade 6.8+ con full add-on support (ReShade64.dll)",
+      "target": "Win64",
+      "fileName": "dxgi.dll",
+      "allowRename": true,
+      "pe": true,
+      "minVersion": "6.8.0.0",
+      "productMarker": "ReShade"
+    },
+    "renodx": {
+      "description": "Add-on DLSS 5 di RenoDX (.addon64)",
+      "target": "Win64",
+      "keepSourceName": true,
+      "extension": ".addon64",
+      "pe": true,
+      "allowedSha256": []
+    },
+    "dlssnr": {
+      "description": "NVIDIA DLSS Neural Rendering runtime (nvngx_dlssnr.dll, firmato NVIDIA)",
+      "target": "Win64",
+      "fileName": "nvngx_dlssnr.dll",
+      "pe": true,
+      "minVersion": "310.8.0.0",
+      "signer": "NVIDIA Corporation"
+    },
+    "dlsssr": {
+      "description": "NVIDIA DLSS Super Resolution aggiornato (nvngx_dlss.dll, override NGX, opzionale)",
+      "target": "NgxOverride",
+      "fileName": "nvngx_dlss.dll",
+      "pe": true,
+      "minVersion": "3.1.13.0",
+      "signer": "NVIDIA Corporation",
+      "optional": true
+    },
+    "preset": {
+      "description": "Preset ReShade IAVAT@R",
+      "target": "Win64",
+      "fileName": "IAVATAR_NeuralViceCity.ini",
+      "bundled": "presets/IAVATAR_NeuralViceCity.ini",
+      "mutable": true
+    },
+    "reshadeini": {
+      "description": "Configurazione ReShade",
+      "target": "Win64",
+      "fileName": "ReShade.ini",
+      "bundled": "presets/ReShade.ini",
+      "mutable": true
+    }
+  }
+}

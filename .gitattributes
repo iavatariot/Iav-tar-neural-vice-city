@@ -1,2 +1,12 @@
-# Auto detect text files and perform LF normalization
 * text=auto
+*.ps1  text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ini  text eol=crlf
+*.py   text eol=lf
+*.md   text eol=lf
+*.png  binary
+*.tga  binary
+*.dds  binary
