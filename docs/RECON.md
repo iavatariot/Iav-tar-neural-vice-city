@@ -81,6 +81,22 @@ Fatti statici:
   - Target RHI: **D3D12** (D3 chiusa, salvo che il menu Renderer offra DX11: verifica opzionale).
   - I log NGX si abilitano via ini (`r.NGX.LogLevel` + cvar di file-log del plugin), in Fase 2.
 
+### Runtime test 3 - primo install reale (2026-10-28 18:52, ReShade.log)
+**Correzione importante:** il gioco presenta in **Direct3D 11**, non D3D12. ReShade intercetta
+`D3D11CreateDevice` con feature level 11_0 e l'add-on DLSS 5 riporta `api=d3d11`. Nonostante `-dx12`
+nella command line, con `Renderer=0` il gioco usa DX11. `D3D12Core.dll` e `SocialClubD3D12Renderer.dll`
+caricati non bastano a dedurre l'RHI (li caricano l'overlay e NGX).
+- DLSS nativo: feature DLSS creata via export **D3D11** NGX, render 1281x721 -> out 1920x1080 (Qualita'),
+  flags IsHDR | DepthInverted | AutoExposure, motion vectors a risoluzione display, non jitterati.
+- Add-on RenoDX DLSS5 Generic v10.8.0: route **D3D11 bridge** (device D3D12 privato, copia delle superfici),
+  NR dopo l'upscale DLSS (`NRHookPoint=0`), runtime firmato 310.9.16.0 riconosciuto (sha256 2BC19BC0...).
+- Esito: `NR-VERDICT state=ENGAGED`, ratio 0.9999, nessun warning, nessun crash (il file
+  `RenoDX-DLSS5-crash.log` registra solo inizio/fine sessione).
+- Costo: **4,7 ms GPU/frame** su RTX 5060 Ti a 1080p; 60 fps col VSync, stima 84 fps senza NR.
+- Effetto visivo percepito: modesto. Default: intensity=1, passes=1, "Detail stability" Auto
+  (filtra l'edit nel tempo). Da valutare con A/B (F6) e regolazioni.
+- Hotkey add-on: F6 attiva/disattiva NR, F5 screenshot.
+
 ## 4. Plugin DLSS — RISOLTO
 - Plugin NVIDIA UE4 **2.3.0** (`Version 7`), compilato nell'exe (moduli `DLSS`, `DLSSUtility`, `NGXD3D11RHI`,
   `NGXD3D12RHI`, `NGXVulkanRHI`) ⇒ **DLSS nativo su DX11 e DX12**.
@@ -126,7 +142,7 @@ Fatti statici:
 ## Decisioni aperte
 - **D1** Fonte della DLL DLSS 5 (BYO + verifica firma? da quale software licenziato?).
 - **D2** Workspace e editor: altro disco disponibile? Disinstallare UE 5.5/5.7?
-- ~~D3~~ Chiusa: target D3D12 (il launcher passa sempre `-dx12`).
+- ~~D3~~ Chiusa: il gioco gira in **D3D11** (vedi runtime test 3); lo stack DLSS 5 funziona via D3D11 bridge.
 
 ## Test manuali (da fare tu)
 1. Avvia Steam, poi da PowerShell:
