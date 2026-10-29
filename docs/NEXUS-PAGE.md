@@ -6,7 +6,8 @@ su **ModDB** incolla la versione Markdown/testo semplice (stesse sezioni, senza 
 ## Campi del modulo di caricamento
 | Campo | Valore |
 |---|---|
-| Nome | IAVAT@R Neural Vice City |
+| Gioco su Nexus | **Grand Theft Auto: The Trilogy – The Definitive Edition** (`nexusmods.com/grandtheftautothetrilogy`): Nexus raggruppa i tre giochi in una sola pagina, quindi specifica "Vice City" nel nome e nel riassunto |
+| Nome | IAVAT@R Neural Vice City (Vice City DE) |
 | Versione | 0.2.0 |
 | Categoria (Nexus) | Visuals and Graphics |
 | Autore | IAVAT@R (Simone Silvestro) |
