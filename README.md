@@ -14,21 +14,30 @@ Mod **single-player e gratuita** per *Grand Theft Auto: Vice City – The Defini
 che porta il **neural rendering di DLSS 5** sul gioco e lo accompagna con un pacchetto di materiali e
 texture pensati per dargli un input migliore.
 
-> **Stato:** in sviluppo — Fase 1 (architettura). Nessuna release pubblica.
+> **Stato:** in sviluppo — Modulo A e Modulo B validati in gioco (2026-10-29). Nessuna release pubblica.
+
+## Installazione
+Un solo comando, da PowerShell come amministratore nella cartella della mod:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\IAVATAR_Setup.ps1
+```
+Guida completa, requisiti e disinstallazione: **[docs/INSTALL.md](docs/INSTALL.md)**.
 
 ## Moduli
 | Modulo | Cosa fa | Stato |
 |---|---|---|
-| **A – Neural Rendering Enabler** | Installer PowerShell transazionale (backup, install, verifica, rollback) che abilita DLSS 5 sfruttando il DLSS nativo del gioco | progettazione |
-| **B – Asset & Material Pack** | Pak `IAVATAR_NeuralViceCity_P.pak` in `Content\Paks\~Mods` con personaggi, pelle, superfici bagnate, neon | progettazione |
+| **A – Neural Rendering Enabler** | Installer PowerShell transazionale (backup, install, verifica, rollback) che abilita DLSS 5 (ReShade + add-on RenoDX + runtime NVIDIA dell'utente) col preset IAVAT@R | funzionante |
+| **B – Asset & Material Pack** | Texture costruite **in locale** dai file del gioco dell'utente: personaggi, ambiente, ambiente HD (IA 2x con Real-ESRGAN), installate in `~mods` con lo stesso motore transazionale | funzionante |
 
-## Requisiti (previsti)
+## Requisiti
 - Windows 10/11, GTA Vice City – The Definitive Edition (Steam, appid 1546990)
-- **GPU NVIDIA RTX serie 50** (il neural rendering ufficiale gira solo su RTX 50) e driver recente
-- Una copia **legittima e firmata NVIDIA** di `nvngx_dlssnr.dll` fornita dall'utente (la mod **non** la include né la scarica)
+- Neural rendering: **GPU NVIDIA RTX serie 50**, driver recente, RTX Remix (app NVIDIA) per `nvngx_dlssnr.dll`
+  firmata NVIDIA (la mod **non** la include né la ridistribuisce), add-on `renodx-dlss5.addon64`
+- Texture: qualunque GPU con Vulkan, ~30 GB liberi durante la costruzione
 
 ## Cosa questa mod NON contiene
-- Nessun file originale o estratto del gioco, nessuna DLL NVIDIA o di terzi.
+- Nessun file originale o estratto del gioco, nessuna DLL NVIDIA o di terzi, nessuna texture già pronta:
+  i pak vengono costruiti sul PC dell'utente dai suoi file del gioco.
 - L'installer usa solo file già presenti sul PC dell'utente o scaricati dalle pagine ufficiali degli autori,
   con verifica di hash/firma e log.
 

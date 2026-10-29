@@ -13,8 +13,36 @@ il 4.26 vanilla rischia incompatibilita'. Per le texture usiamo quindi una strad
    (hash FNV-64 verificato su tutte le 263 voci di pakchunk1), nome `IAVATAR_NeuralViceCity_P.pak`;
 6. **deploy** in `Gameface\Content\Paks\~mods\` (lo fara' l'installer del Modulo A).
 
-L'editor UE 4.26 servira' solo se vorremo **aumentare la risoluzione** o cambiare materiali: e' la fase
-successiva, da valutare dopo il pilota.
+Aggiornamento 2026-10-29: la **risoluzione si aumenta senza editor** (`iav_texture.rebuild`, vedi sotto).
+L'editor UE servirebbe solo per cambiare materiali/shader. Sul PC c'e' solo UE 5.5/5.7, che non cuoce per 4.26.
+
+## Texture a risoluzione maggiore (senza editor)
+Layout cotto UE 4.26 di questa build (verificato):
+```
+FName PixelFormat | int64 SkipOffset (assoluto = inizio del FName 'None' finale)
+| SizeX SizeY Packed | FString PF_xxx | FirstMip NumMips | mip[] | bIsVirtual | FName None | tag 9E2A83C1
+mip = bCooked(i32) BulkFlags(u32) Count(i32) Size(i32) Offset(i64) [dati se inline] SizeX SizeY SizeZ
+```
+- Offset dei mip **inline** = posizione assoluta nel file virtuale uasset+uexp; dei mip **separati** = posizione nel .ubulk.
+- Nel .uasset cambiano solo `SerialSize` dell'export (= len(uexp)-4) e `BulkDataStartOffset` (= len(uasset)+len(uexp)-4).
+- Politica: gli ultimi K mip restano inline come nell'originale, i maggiori vanno nel .ubulk; flag copiati dall'originale.
+- Limite: `MaxLODSize=2048` per i gruppi World/WorldNormalMap/Character nel profilo Windows
+  (`DefaultDeviceProfiles.ini`): oltre, il motore scarta i mip. Il profilo fissa anche `r.Streaming.PoolSize=800`:
+  con l'ambiente HD l'installer lo porta a 2-4 GB in `CustomSettings.ini` in base alla VRAM.
+- Priorita' dei pak: il suffisso `_9_P` fa prevalere il pak HD su `IAVATAR_NeuralViceCity_Environment_P.pak`.
+
+## Ingrandimento IA (Real-ESRGAN)
+1. `upscale_export.py`: PNG RGB con 16 px di bordo (`wrap` per `Tilables/`, `edge` altrove) in `work/upscale/in`.
+2. Real-ESRGAN `realesrgan-x4plus` sulla GPU (Vulkan), poi riduzione 4x -> 2x (bicubica, PowerShell/System.Drawing)
+   in `work/upscale/out`, a blocchi da 40, riprendibile. ~3,7 s per texture 1024 su RTX 5060 Ti.
+3. `build.py`: `ai_upscale` toglie il bordo e porta l'albedo a 2x; le normal map vengono portate alla stessa
+   risoluzione (`resize_normal`) e ricevono il micro-rilievo ricavato dall'albedo IA (`normal_detail`).
+
+## Costruzione sul PC dell'utente
+I pak contengono texture derivate dai file del gioco, quindi **non si distribuiscono**: l'installer
+(`-Install -Textures`, `IavTextures.psm1`) prepara un Python privato e Real-ESRGAN (hash fissati in
+`moduleB-assets/config/runtime.json`), rigenera i manifest dei materiali (`discover.py`) e costruisce
+i tre pak dai file del gioco dell'utente. Su Windows Oodle arriva dalla DLL del gioco.
 
 ## Scoperte sul pilota (Tommy, pelle)
 - `MI_tommy_skin` (Peds) -> parent `MI_Character_White_SkinOnly_P_Base`, parametri:

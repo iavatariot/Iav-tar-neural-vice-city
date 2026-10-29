@@ -337,6 +337,8 @@ def main() -> int:
             print(f'[PARZIALE] pak: {len(w.done)}/{len(files)} file scritti. Rilancia lo stesso comando.')
             return 3
         w.add(rel, open(files[rel], 'rb').read(), save=(k % 25 == 0))
+        if k % 500 == 0 or k == len(todo) - 1:
+            print(f'[PAK] {len(w.done)}/{len(files)} file scritti', flush=True)
     info = w.finalize()
     # ---------------------------------------------------------------- 3. verifica a campione
     rd = iav_pak.PakReader(pak_path)

@@ -160,7 +160,7 @@ function New-IavPlan {
 function Write-IavPlan {
     param([Parameter(Mandatory)]$Plan)
     foreach ($op in $Plan.Operations) {
-        if ($op.Type -eq 'AddFile') { Write-IavLog -Level PLAN -Message ('[{0}] AGGIUNGI {1}  (sha256 {2})' -f $op.Id, $op.Destination, $op.Sha256) }
+        if ($op.Type -eq 'AddFile') { Write-IavLog -Level PLAN -Message ('[{0}] {3} {1}  (sha256 {2})' -f $op.Id, $op.Destination, $op.Sha256, $(if ($op.PSObject.Properties.Name -contains 'Adopt' -and $op.Adopt) { 'PRENDI IN CARICO' } else { 'AGGIUNGI' })) }
         else { Write-IavLog -Level PLAN -Message ('[{0}] BLOCCO INI [{1}] in {2}: {3}' -f $op.Id, $op.Section, $op.Destination, ($op.Lines -join ' | ')) }
     }
     foreach ($n in $Plan.Notes) { Write-IavLog -Level INFO -Message $n }
@@ -181,7 +181,8 @@ function Invoke-IavApplyOperation {
         $probe = $dir
         while ($probe -and -not (Test-Path -LiteralPath $probe)) { $missing.Insert(0, $probe); $probe = Split-Path -Parent $probe }
         foreach ($m in $missing) { New-Item -ItemType Directory -Path $m -Force | Out-Null; $created.Add($m) }
-        Copy-Item -LiteralPath $Op.Source -Destination $Op.Destination -Force
+        $adopt = ($Op.PSObject.Properties.Name -contains 'Adopt' -and $Op.Adopt -and (Test-Path -LiteralPath $Op.Destination))
+        if (-not $adopt) { Copy-Item -LiteralPath $Op.Source -Destination $Op.Destination -Force }
         $after = Get-IavSha256 -Path $Op.Destination
         if ($after -ne $Op.Sha256) { throw ('Verifica copia fallita per {0}: atteso {1}, trovato {2}' -f $Op.Destination, $Op.Sha256, $after) }
         return [pscustomobject]@{ Id = $Op.Id; Type = 'AddFile'; Component = $Op.Component; Destination = $Op.Destination; Sha256After = $after; Mutable = $Op.Mutable; CreatedDirs = $created.ToArray() }
@@ -266,8 +267,10 @@ function Invoke-IavInstall {
         [Parameter(Mandatory)][string]$StateDir,
         [switch]$DryRun,
         [scriptblock]$Confirm,
-        [scriptblock]$FaultInjector
+        [scriptblock]$FaultInjector,
+        [hashtable]$SnapshotDirs
     )
+    if (-not $SnapshotDirs) { $SnapshotDirs = @{ Win64 = $Game.Win64; NgxOverride = $Game.NgxOverrideDir } }
     $existing = Read-IavManifest -StateDir $StateDir
     if ($existing) {
         $status = Get-IavStatus -StateDir $StateDir -Game $Game
@@ -304,8 +307,11 @@ function Invoke-IavInstall {
         installedAt    = (Get-Date).ToString('o')
         game           = [pscustomobject]@{ Root = $Game.Root; BuildId = $Game.BuildId; ExeSha256 = $Game.ExeSha256; ExeVersion = $Game.ExeVersion }
         backupDir      = $backupDir
-        snapshots      = [pscustomobject]@{ Win64 = @(Get-IavDirSnapshot -Path $Game.Win64); NgxOverride = @(Get-IavDirSnapshot -Path $Game.NgxOverrideDir) }
+        snapshots      = [pscustomobject]@{}
         operations     = @()
+    }
+    foreach ($k in ($SnapshotDirs.Keys | Sort-Object)) {
+        $manifest.snapshots | Add-Member -NotePropertyName $k -NotePropertyValue ([pscustomobject]@{ Path = $SnapshotDirs[$k]; Files = @(Get-IavDirSnapshot -Path $SnapshotDirs[$k]) })
     }
     Save-IavManifest -StateDir $StateDir -Manifest $manifest
 
@@ -373,10 +379,16 @@ function Invoke-IavUninstall {
     # File creati a runtime (log di ReShade, cache degli add-on) che prima non c'erano.
     $ours = @($m.operations | ForEach-Object { Split-Path -Leaf $_.Destination })
     $newFiles = New-Object System.Collections.Generic.List[string]
-    foreach ($pair in @(@('Win64', $Game.Win64), @('NgxOverride', $Game.NgxOverrideDir))) {
-        $before = @($m.snapshots.($pair[0]))
-        foreach ($f in (Get-IavDirSnapshot -Path $pair[1])) {
-            if (-not ($before -contains $f) -and -not ($ours -contains $f)) { $newFiles.Add((Join-Path $pair[1] $f)) }
+    foreach ($prop in @($m.snapshots.PSObject.Properties)) {
+        $v = $prop.Value
+        if ($v -is [array] -or $null -eq $v -or -not ($v.PSObject.Properties.Name -contains 'Path')) {
+            # manifest della 0.1.0: elenco di nomi, cartella dedotta dal nome
+            $dir = switch ($prop.Name) { 'Win64' { $Game.Win64 } 'NgxOverride' { $Game.NgxOverrideDir } default { $null } }
+            $before = @($v)
+        } else { $dir = $v.Path; $before = @($v.Files) }
+        if (-not $dir) { continue }
+        foreach ($f in (Get-IavDirSnapshot -Path $dir)) {
+            if (-not ($before -contains $f) -and -not ($ours -contains $f)) { $newFiles.Add((Join-Path $dir $f)) }
         }
     }
     foreach ($f in $newFiles) { Write-IavLog -Level PLAN -Message ('File nuovo creato dopo l''installazione: {0}{1}' -f $f, $(if ($PurgeNewFiles) { ' -> verra'' rimosso' } else { ' -> lasciato (usa -PurgeNewFiles)' })) }

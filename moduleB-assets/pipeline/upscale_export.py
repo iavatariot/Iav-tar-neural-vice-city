@@ -45,8 +45,8 @@ def main() -> int:
         try:
             ue = src.get(it['asset'] + '.uexp')
             info = T.effective(T.parse(ue))
-            if info.width * op.get('scale', 2) > B.MAX_SIZE or info.width < B.MIN_EFFECTIVE:
-                print('[SALTATO]', it['asset'], f'{info.width}px')
+            if max(info.width, info.height) * op.get('scale', 2) > B.MAX_SIZE or info.width < B.MIN_EFFECTIVE:
+                print('[SALTATO]', it['asset'], f'{info.width}x{info.height}px')
                 continue
             img = B._decode_asset_image(it['asset'], src)
         except (ValueError, OSError, TypeError) as e:

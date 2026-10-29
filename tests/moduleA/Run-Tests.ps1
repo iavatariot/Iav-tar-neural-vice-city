@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $src = Join-Path $repo 'moduleA-enabler\src'
 $moduleRoot = Join-Path $repo 'moduleA-enabler'
-foreach ($m in 'IavCore', 'IavDetect', 'IavState', 'IavPlan', 'IavReShade') { Import-Module (Join-Path $src ('lib\{0}.psm1' -f $m)) -Force -DisableNameChecking }
+foreach ($m in 'IavCore', 'IavDetect', 'IavState', 'IavPlan', 'IavReShade', 'IavTextures') { Import-Module (Join-Path $src ('lib\{0}.psm1' -f $m)) -Force -DisableNameChecking }
 
 $script:Pass = 0; $script:Fail = 0; $script:Failures = New-Object System.Collections.Generic.List[string]
 function Assert-True([bool]$Cond, [string]$Msg) { if (-not $Cond) { throw ('ASSERT: ' + $Msg) } }
@@ -274,6 +274,112 @@ It 'Entry point: -Status e -Install -DryRun via script reale (exit code e nessun
     # Senza mock di firma, sul PC reale la DLL finta non e' firmata NVIDIA: atteso exit 2 (piano non valido).
     Assert-Eq $code 2 'exit code dry-run con DLL non firmata'
     Assert-Eq (Get-TreeHash -Paths @($f.Game, $f.Docs)) $before 'nessuna modifica'
+}
+
+# ------------------------------------------------------------ Modulo B lato utente (texture)
+
+function New-FakePak([string]$Path, [int]$Seed) {
+    $b = New-Object byte[] 70000; (New-Object Random $Seed).NextBytes($b)
+    $d = Split-Path -Parent $Path; if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+    [IO.File]::WriteAllBytes($Path, $b)
+}
+
+It 'Conferma: SI/si/Si/s accettati, tutto il resto rifiutato' {
+    foreach ($y in @('SI', 'si', 'Si', ' si ', 's', 'S')) { Assert-True (Test-IavYes $y) ('accettato: ' + $y) }
+    foreach ($n in @('', 'no', 'N', 'sim', 'yes', $null)) { Assert-True (-not (Test-IavYes $n)) ('rifiutato: ' + $n) }
+}
+
+It 'Texture: pool di streaming scelto in base alla VRAM' {
+    $rt = Get-IavRuntimeConfig -RepoRoot $repo
+    Assert-Eq (Get-IavStreamingPoolMb -Runtime $rt -VramMb 16303) 4096 '16 GB'
+    Assert-Eq (Get-IavStreamingPoolMb -Runtime $rt -VramMb 12282) 3072 '12 GB'
+    Assert-Eq (Get-IavStreamingPoolMb -Runtime $rt -VramMb 8151) 2048 '8 GB'
+    Assert-Eq (Get-IavStreamingPoolMb -Runtime $rt -VramMb 6000) 1200 '6 GB'
+    Assert-Eq (Get-IavStreamingPoolMb -Runtime $rt -VramMb $null) 1200 'VRAM sconosciuta -> valore prudente'
+}
+
+It 'Texture: config runtime con soli URL ufficiali e hash a 64 cifre' {
+    $rt = Get-IavRuntimeConfig -RepoRoot $repo
+    $all = @($rt.python) + @($rt.wheels) + @($rt.realesrgan)
+    foreach ($x in $all) {
+        Assert-True ($x.url -match '^https://(www\.python\.org|files\.pythonhosted\.org|github\.com)/') ('URL ufficiale: ' + $x.url)
+        Assert-True ($x.sha256 -match '^[0-9A-Fa-f]{64}$') ('hash: ' + $x.url)
+    }
+    $threw = $false
+    try { [void](Save-IavVerifiedDownload -Url 'https://example.com/x.zip' -Sha256 ('0' * 64) -Directory $env:TEMP) } catch { $threw = $true }
+    Assert-True $threw 'URL non ufficiale rifiutato prima di qualunque download'
+}
+
+It 'Texture: install pak + pool -> verifica -> uninstall ripristina bit-a-bit' {
+    $f = New-Fixture; $fixtures.Add($f.Root)
+    $g = Get-IavGameInfo -GamePath $f.Game -DocumentsPath $f.Docs
+    New-Item -ItemType Directory -Path $g.ModsDir -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $g.ModsDir 'altra_mod_P.pak'), 'non nostra')
+    $before = Get-TreeHash -Paths @($f.Game, $f.Docs)
+    $paks = @(
+        [pscustomobject]@{ Id = 'characters'; Path = (Join-Path $f.Root 'build\c\C_P.pak'); Name = 'IAVATAR_NeuralViceCity_Characters_P.pak' },
+        [pscustomobject]@{ Id = 'hd'; Path = (Join-Path $f.Root 'build\h\H_P.pak'); Name = 'IAVATAR_NeuralViceCity_HD_9_P.pak' })
+    New-FakePak $paks[0].Path 1; New-FakePak $paks[1].Path 2
+    $plan = New-IavTexturePlan -Game $g -Paks $paks -PoolMb 4096
+    Assert-Eq $plan.Errors.Count 0 ('errori: ' + ($plan.Errors -join '; '))
+    Assert-Eq $plan.Operations.Count 3 '2 pak + pool'
+    $st = Join-Path $f.State 'textures'
+    $r = Invoke-IavInstall -Config $config -Game $g -Plan $plan -StateDir $st -SnapshotDirs @{ Mods = $g.ModsDir }
+    Assert-Eq $r.Result 'Installed' 'install'
+    Assert-True (Test-Path (Join-Path $g.ModsDir 'IAVATAR_NeuralViceCity_HD_9_P.pak')) 'pak HD in ~mods'
+    Assert-True ([IO.File]::ReadAllText($g.CustomSettings) -match 'r\.Streaming\.PoolSize=4096') 'pool in CustomSettings.ini'
+    Assert-True (Get-IavStatus -StateDir $st -Game $g).Healthy 'stato integro'
+    $u = Invoke-IavUninstall -StateDir $st -Game $g
+    Assert-True $u.Clean 'uninstall pulito'
+    Assert-Eq (Get-TreeHash -Paths @($f.Game, $f.Docs)) $before 'gioco e CustomSettings.ini come prima; la mod di terzi resta'
+}
+
+It 'Texture: pak identico gia'' presente -> preso in carico; diverso -> conflitto' {
+    $f = New-Fixture; $fixtures.Add($f.Root)
+    $g = Get-IavGameInfo -GamePath $f.Game -DocumentsPath $f.Docs
+    $src = Join-Path $f.Root 'build\e\E_P.pak'; New-FakePak $src 3
+    New-Item -ItemType Directory -Path $g.ModsDir -Force | Out-Null
+    $dst = Join-Path $g.ModsDir 'IAVATAR_NeuralViceCity_Environment_P.pak'
+    Copy-Item -LiteralPath $src -Destination $dst
+    $paks = @([pscustomobject]@{ Id = 'environment'; Path = $src; Name = 'IAVATAR_NeuralViceCity_Environment_P.pak' })
+    $plan = New-IavTexturePlan -Game $g -Paks $paks -PoolMb 0
+    Assert-Eq $plan.Errors.Count 0 'identico: nessun conflitto'
+    Assert-True $plan.Operations[0].Adopt 'operazione di presa in carico'
+    $st = Join-Path $f.State 'textures'
+    Assert-Eq (Invoke-IavInstall -Config $config -Game $g -Plan $plan -StateDir $st -SnapshotDirs @{ Mods = $g.ModsDir }).Result 'Installed' 'install'
+    [void](Invoke-IavUninstall -StateDir $st -Game $g)
+    Assert-True (-not (Test-Path -LiteralPath $dst)) 'uninstall rimuove anche il pak preso in carico'
+    New-FakePak $dst 99
+    $plan2 = New-IavTexturePlan -Game $g -Paks $paks -PoolMb 0
+    Assert-Eq $plan2.Errors.Count 1 'diverso: conflitto segnalato'
+    Assert-Eq (Get-IavSha256 -Path $dst) (Get-IavSha256 -Path $dst) 'nessuna sovrascrittura in fase di piano'
+}
+
+It 'Uninstall compatibile con i manifest della 0.1.0 (snapshot come elenco di nomi)' {
+    $f = New-Fixture; $fixtures.Add($f.Root)
+    $t = New-TestPlan -F $f
+    [void](Invoke-IavInstall -Config $config -Game $t.Game -Plan $t.Plan -StateDir $f.State)
+    $m = Read-IavManifest -StateDir $f.State
+    $m.snapshots = [pscustomobject]@{ Win64 = @($m.snapshots.Win64.Files); NgxOverride = @($m.snapshots.NgxOverride.Files) }
+    Save-IavManifest -StateDir $f.State -Manifest $m
+    [IO.File]::WriteAllText((Join-Path $t.Game.Win64 'ReShade.log'), 'runtime')
+    $u = Invoke-IavUninstall -StateDir $f.State -Game $t.Game
+    Assert-Eq @($u.NewFiles).Count 1 'file runtime riconosciuto anche con il manifest vecchio'
+}
+
+It 'Auto: trova add-on RenoDX e DLL NVIDIA di RTX Remix' {
+    $f = New-Fixture; $fixtures.Add($f.Root)
+    $dl = Join-Path $f.Root 'Downloads'; New-Item -ItemType Directory -Path $dl -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $f.Inputs 'renodx-dlss5.addon64') -Destination $dl
+    $remix = Join-Path $f.Root 'RTX Remix'
+    $trex = Join-Path $remix 'deps\remix_runtime\runtime\.trex'
+    New-Item -ItemType Directory -Path $trex -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $f.Inputs 'nvngx_dlssnr.dll') -Destination $trex
+    Copy-Item -LiteralPath (Join-Path $f.Inputs 'sr\nvngx_dlss.dll') -Destination $trex
+    $found = Find-IavUserComponents -SearchDirs @($dl) -RemixRoot $remix
+    Assert-Eq (Split-Path -Leaf $found.renodx) 'renodx-dlss5.addon64' 'add-on'
+    Assert-True ($found.dlssnr -like '*.trex*nvngx_dlssnr.dll') 'dlssnr da RTX Remix'
+    Assert-True ($found.dlsssr -like '*.trex*nvngx_dlss.dll') 'dlss SR da RTX Remix'
 }
 
 foreach ($r in $fixtures) { try { Remove-Item -LiteralPath $r -Recurse -Force } catch { } }

@@ -3,6 +3,26 @@
 Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [SemVer](https://semver.org/lang/it/).
 
 ## [Unreleased]
+### Added (Installazione completa per l'utente)
+- `IAVATAR_Setup.ps1`: un solo comando per Modulo A + texture; `-Uninstall`, `-SkipNeural`, `-SkipTextures`.
+- Modulo A `-Auto`: trova l'add-on RenoDX (Download, `C:\IAVATAR_input`) e le DLL NVIDIA di RTX Remix,
+  scarica ReShade dal sito ufficiale.
+- Modulo A `-Textures` (`IavTextures.psm1`): costruzione in locale dei pak dai file del gioco dell'utente
+  (Python 3.12 embeddable + numpy + Pillow + Real-ESRGAN, solo URL ufficiali con SHA-256 fissati in
+  `moduleB-assets/config/runtime.json`), installazione in `~mods` con manifest separato, backup, verifica,
+  rollback; pak identici gia' presenti presi in carico; pool di streaming `r.Streaming.PoolSize` in
+  `CustomSettings.ini` in base alla VRAM (il gioco ne fissa 800 MB).
+- `docs/INSTALL.md`: guida utente (requisiti, installazione, DLAA dall'app NVIDIA, tasti, problemi comuni).
+- Test: 21 test PowerShell (6 nuovi: pool, URL/hash, install/uninstall pak, presa in carico, manifest 0.1.0,
+  auto-rilevamento); `tests/moduleB/test_texture_rebuild.py` sui file reali del gioco.
+### Added (Modulo B - texture HD)
+- `iav_texture.rebuild`: riscrittura di una Texture2D a risoluzione diversa (header, catena mip completa,
+  offset assoluti dei mip inline, SkipOffset, ImportedSize, SerialSize e BulkDataStartOffset nel .uasset).
+  Round-trip alla stessa risoluzione identico byte per byte; validato in gioco a 2x (marciapiedi Ocean Beach).
+- Operazioni `ai_upscale` (Real-ESRGAN x4 ridotto a 2x, padding "wrap" per le texture ripetute) e
+  `resize_normal` (normal map alla risoluzione dell'albedo, max 2048 = MaxLODSize del profilo Windows).
+- `upscale_export.py`, ricette `hd-test` e `environment-hd-v1` (2.665 albedo 128-1024 px + normal),
+  pak `IAVATAR_NeuralViceCity_HD_9_P.pak` con priorita' sul pak Environment.
 ### Added (Showcase)
 - `tools/showcase/compose.py`: confronti 4 riquadri Vanilla / Solo texture / Solo DLSS 5 / Completo
   dalle catture F5, con fascia di zoom sullo stesso punto. Gli screenshot originali non vengono toccati.

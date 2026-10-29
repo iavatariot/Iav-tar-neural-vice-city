@@ -1,0 +1,56 @@
+{
+  "_comment": "Strumenti che il Modulo B scarica sul PC dell'utente per costruire le texture IN LOCALE dai file del suo gioco. Solo URL ufficiali, hash SHA-256 fissati: un hash diverso blocca tutto. Nessun file del gioco viene mai distribuito.",
+  "python": {
+    "description": "Python 3.12.10 embeddable (Python Software Foundation, licenza PSF)",
+    "url": "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embeddable-amd64.zip",
+    "officialPage": "https://www.python.org/downloads/release/python-31210/",
+    "hashSource": "https://www.python.org/ftp/python/3.12.10/windows-3.12.10.json (indice ufficiale python.org, voce pythonembed-3.12-64)",
+    "sha256": "156C7EEA90D58CD7E91A23F28A0056616B13E9F4CF4901B7B99B837B7848C6DA",
+    "pth": "python312._pth"
+  },
+  "wheels": [
+    {
+      "name": "numpy 2.2.6 (BSD-3-Clause)",
+      "url": "https://files.pythonhosted.org/packages/36/fa/8c9210162ca1b88529ab76b41ba02d433fd54fecaf6feb70ef9f124683f1/numpy-2.2.6-cp312-cp312-win_amd64.whl",
+      "officialPage": "https://pypi.org/project/numpy/2.2.6/",
+      "sha256": "C1F9540BE57940698ED329904DB803CF7A402F3FC200BFE599334C9BD84A40B2"
+    },
+    {
+      "name": "Pillow 11.3.0 (MIT-CMU)",
+      "url": "https://files.pythonhosted.org/packages/8c/ce/e7dfc873bdd9828f3b6e5c2bbb74e47a98ec23cc5c74fc4e54462f0d9204/pillow-11.3.0-cp312-cp312-win_amd64.whl",
+      "officialPage": "https://pypi.org/project/pillow/11.3.0/",
+      "sha256": "A6444696FCE635783440B7F7A9FC24B3AD10A9EA3F0AB66C5905BE1C19CCF17D"
+    }
+  ],
+  "realesrgan": {
+    "description": "Real-ESRGAN ncnn-vulkan v0.2.5.0 (Xintao Wang, BSD-3-Clause)",
+    "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip",
+    "officialPage": "https://github.com/xinntao/Real-ESRGAN/releases/tag/v0.2.5.0",
+    "sha256": "ABC02804E17982A3BE33675E4D471E91EA374E65B70167ABC09E31ACB412802D",
+    "exeSha256": "07E49F7CBB4EDE01AE4DD4C399D3A7E5846E3D2085C3128EFF881E55CB7B1A0C",
+    "model": "realesrgan-x4plus",
+    "modelBinSha256": "713EE713B0353AFAA27976F0563A64A5043BD70B9BD8936C2E26E25EBCDBCDDF",
+    "modelParamSha256": "35330ECECCEA33B6C397A72548E788D5D53BECEE4734C50B7FADA36E89F10A86"
+  },
+  "build": {
+    "_comment": "Livello IAVAT@R di riferimento (validato in gioco il 2026-10-29). Ordine = ordine di costruzione. I manifest dei materiali si rigenerano dal gioco dell'utente (discover.py) se mancano.",
+    "manifests": [
+      { "file": "characters.json", "root": "Gameface/Content/ViceCity/Characters" },
+      { "file": "environment.json", "root": "Gameface/Content/ViceCity/Environment" }
+    ],
+    "steps": [
+      { "id": "characters", "recipe": "characters-v3.json", "out": "characters", "pak": "IAVATAR_NeuralViceCity_Characters_P.pak" },
+      { "id": "environment", "recipe": "environment-v2.json", "out": "environment", "pak": "IAVATAR_NeuralViceCity_Environment_P.pak" },
+      { "id": "hd", "recipe": "environment-hd-v1.json", "out": "hd", "pak": "IAVATAR_NeuralViceCity_HD_9_P.pak", "upscale": true }
+    ]
+  },
+  "streaming": {
+    "_comment": "Il profilo Windows del gioco fissa r.Streaming.PoolSize=800 (MB): con le texture HD e' troppo poco. Valore per VRAM (GB minimi -> MB di pool).",
+    "poolByVramGb": [
+      { "minGb": 15, "poolMb": 4096 },
+      { "minGb": 11, "poolMb": 3072 },
+      { "minGb": 7, "poolMb": 2048 },
+      { "minGb": 0, "poolMb": 1200 }
+    ]
+  }
+}

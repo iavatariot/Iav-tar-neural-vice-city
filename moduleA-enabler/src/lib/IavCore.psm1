@@ -134,6 +134,14 @@ function Test-IavNvidiaSigned {
     }
 }
 
+function Test-IavYes {
+    <# Conferma esplicita: "SI", "si", "Si", "sì", "s" (spazi ignorati). Qualunque altra risposta = no. #>
+    param([AllowNull()][AllowEmptyString()][string]$Answer)
+    if (-not $Answer) { return $false }
+    $a = $Answer.Trim().ToUpperInvariant()
+    return ($a -eq 'SI' -or $a -eq 'S' -or $a -eq ('S' + [char]0x00CC))
+}
+
 function Test-IavAdmin {
     if ($env:OS -ne 'Windows_NT') { return $true }
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -157,5 +165,5 @@ function Write-IavTextFileAtomic {
 }
 
 Export-ModuleMember -Function Get-IavBanner, Initialize-IavLog, Get-IavLogFile, Write-IavLog, Get-IavSha256, Get-IavPeInfo,
-    Test-IavFileContainsText, Get-IavSignature, Set-IavSignatureProvider, Test-IavNvidiaSigned, Test-IavAdmin,
+    Test-IavFileContainsText, Get-IavSignature, Set-IavSignatureProvider, Test-IavNvidiaSigned, Test-IavAdmin, Test-IavYes,
     ConvertTo-IavJson, Write-IavTextFileAtomic
