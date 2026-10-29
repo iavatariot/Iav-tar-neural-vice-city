@@ -11,6 +11,7 @@ $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $src = Join-Path $repo 'moduleA-enabler\src'
 $moduleRoot = Join-Path $repo 'moduleA-enabler'
 foreach ($m in 'IavCore', 'IavDetect', 'IavState', 'IavPlan', 'IavReShade', 'IavTextures') { Import-Module (Join-Path $src ('lib\{0}.psm1' -f $m)) -Force -DisableNameChecking }
+Import-Module (Join-Path $repo 'release\IavRelease.psm1') -Force -DisableNameChecking
 
 $script:Pass = 0; $script:Fail = 0; $script:Failures = New-Object System.Collections.Generic.List[string]
 function Assert-True([bool]$Cond, [string]$Msg) { if (-not $Cond) { throw ('ASSERT: ' + $Msg) } }
@@ -380,6 +381,59 @@ It 'Auto: trova add-on RenoDX e DLL NVIDIA di RTX Remix' {
     Assert-Eq (Split-Path -Leaf $found.renodx) 'renodx-dlss5.addon64' 'add-on'
     Assert-True ($found.dlssnr -like '*.trex*nvngx_dlssnr.dll') 'dlssnr da RTX Remix'
     Assert-True ($found.dlsssr -like '*.trex*nvngx_dlss.dll') 'dlss SR da RTX Remix'
+}
+
+# ------------------------------------------------------------ release: guardia sui file proprietari
+
+It 'Release: la repo reale passa la guardia, work\ e docs\recon esclusi' {
+    $files = @(Get-IavReleaseFiles -RepoRoot $repo)
+    Assert-True ($files.Count -ge 20) ('file in release: ' + $files.Count)
+    Assert-True (-not ($files | Where-Object { $_ -match '^(work|docs/recon|release/dist)/' })) 'nessun file da work, docs/recon, release/dist'
+    Assert-True ($files -contains 'IAVATAR_Setup.ps1') 'setup incluso'
+    $bad = @(foreach ($f in $files) { $w = Test-IavReleaseFile -Path (Join-Path $repo $f) -RelativePath $f; if ($w.Count) { $f + ': ' + ($w -join '; ') } })
+    Assert-Eq $bad.Count 0 ('violazioni: ' + ($bad -join ' | '))
+}
+
+It 'Release: guardia blocca pak, DLL camuffata, firma pak, asset UE, file grandi' {
+    $d = Join-Path ([IO.Path]::GetTempPath()) ('iav_rel_' + [guid]::NewGuid().ToString('N')); $fixtures.Add($d)
+    New-Item -ItemType Directory -Path $d -Force | Out-Null
+    $ok = Join-Path $d 'ok.py'; [IO.File]::WriteAllText($ok, "print('ciao')`n")
+    Assert-Eq (Test-IavReleaseFile -Path $ok -RelativePath 'moduleB-assets/pipeline/ok.py').Count 0 'sorgente valido ammesso'
+    $pak = Join-Path $d 'x.pak'; [IO.File]::WriteAllText($pak, 'x')
+    Assert-True ((Test-IavReleaseFile -Path $pak -RelativePath 'x.pak') -join ';' -match 'estensione vietata') '.pak bloccato'
+    $pe = Join-Path $d 'tool.py'; [IO.File]::WriteAllBytes($pe, [byte[]](0x4D, 0x5A, 0x90, 0x00, 0x41))
+    Assert-True ((Test-IavReleaseFile -Path $pe -RelativePath 'tool.py') -join ';' -match 'MZ') 'DLL rinominata .py bloccata'
+    $pm = Join-Path $d 'data.json'; [IO.File]::WriteAllBytes($pm, [byte[]](0x7B, 0x20, 0xE1, 0x12, 0x6F, 0x5A, 0x7D))
+    Assert-True ((Test-IavReleaseFile -Path $pm -RelativePath 'data.json') -join ';' -match 'pak Unreal') 'firma pak dentro un json bloccata'
+    $ue = Join-Path $d 'asset.md'; [IO.File]::WriteAllBytes($ue, [byte[]](0xC1, 0x83, 0x2A, 0x9E, 0x41))
+    Assert-True ((Test-IavReleaseFile -Path $ue -RelativePath 'asset.md') -join ';' -match 'package Unreal') 'asset UE bloccato'
+    $nv = Join-Path $d 'nvngx_dlssnr.json'; [IO.File]::WriteAllText($nv, '{}')
+    Assert-True ((Test-IavReleaseFile -Path $nv -RelativePath 'nvngx_dlssnr.json') -join ';' -match 'nome vietato') 'nome NVIDIA bloccato'
+    $big = Join-Path $d 'big.md'; [IO.File]::WriteAllText($big, ('a' * 1100000))
+    Assert-True ((Test-IavReleaseFile -Path $big -RelativePath 'big.md') -join ';' -match 'troppo grande') 'file grande bloccato'
+    $wk = Join-Path $d 'w.py'; [IO.File]::WriteAllText($wk, 'x = 1')
+    Assert-True ((Test-IavReleaseFile -Path $wk -RelativePath 'work/build/w.py') -join ';' -match 'cartella esclusa') 'work\ escluso'
+}
+
+It 'Release: con una violazione nessuno zip; pulito -> zip con manifest e .sha256' {
+    $d = Join-Path ([IO.Path]::GetTempPath()) ('iav_rel_' + [guid]::NewGuid().ToString('N')); $fixtures.Add($d)
+    foreach ($f in @('README.md', 'LICENSE', 'moduleB-assets/pipeline/a.py')) {
+        $p = Join-Path $d $f; New-Item -ItemType Directory -Path (Split-Path -Parent $p) -Force | Out-Null; [IO.File]::WriteAllText($p, "ok`n")
+    }
+    $bad = Join-Path $d 'moduleB-assets/pipeline/b.py'; [IO.File]::WriteAllBytes($bad, [byte[]](0x4D, 0x5A, 0x00))
+    $out = Join-Path $d 'dist'
+    $r = New-IavReleasePackage -RepoRoot $d -Version '9.9.9' -OutDir $out
+    Assert-True (-not $r.Ok) 'bloccato'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $out 'IAVATAR_NeuralViceCity_v9.9.9.zip'))) 'nessuno zip creato'
+    Remove-Item -LiteralPath $bad -Force
+    $r2 = New-IavReleasePackage -RepoRoot $d -Version '9.9.9' -OutDir $out
+    Assert-True $r2.Ok ('pulito: ' + ($r2.Violations -join '; '))
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z = [IO.Compression.ZipFile]::OpenRead($r2.Zip)
+    try { $names = @($z.Entries | ForEach-Object { $_.FullName }) } finally { $z.Dispose() }
+    Assert-True ($names -contains 'IAVATAR_NeuralViceCity_v9.9.9/RELEASE-MANIFEST.txt') 'manifest nello zip'
+    Assert-True ($names -contains 'IAVATAR_NeuralViceCity_v9.9.9/moduleB-assets/pipeline/a.py') 'percorsi con /'
+    Assert-True (Test-Path -LiteralPath ($r2.Zip + '.sha256')) '.sha256 accanto'
 }
 
 foreach ($r in $fixtures) { try { Remove-Item -LiteralPath $r -Recurse -Force } catch { } }

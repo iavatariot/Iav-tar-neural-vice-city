@@ -208,6 +208,8 @@ function Invoke-IavTextureBuild {
     foreach ($mf in $Runtime.build.manifests) {
         $mpath = Join-Path $RepoRoot ('moduleB-assets\assets-manifest\{0}' -f $mf.file)
         if (Test-Path -LiteralPath $mpath) { continue }
+        $mdir = Split-Path -Parent $mpath
+        if (-not (Test-Path -LiteralPath $mdir)) { New-Item -ItemType Directory -Path $mdir -Force | Out-Null }
         Write-IavLog -Level INFO -Message ('Analisi dei materiali del gioco: {0}...' -f $mf.file)
         $code = Invoke-IavPython -Python $Python -WorkingDir $pipeline -Arguments @('discover.py', '--game', $Game.Root, '--root', $mf.root, '--out', $mpath)
         if ($code -ne 0 -or -not (Test-Path -LiteralPath $mpath)) { throw ('Analisi materiali fallita ({0}, codice {1}).' -f $mf.file, $code) }

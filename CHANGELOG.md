@@ -3,6 +3,17 @@
 Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [SemVer](https://semver.org/lang/it/).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-10-29
+### Added (Release)
+- `release/New-IavRelease.ps1` + `release/IavRelease.psm1`: pacchetto zip da allowlist (solo sorgenti e
+  configurazione testuale), test obbligatori prima del pacchetto, guardia che blocca pak/asset Unreal,
+  texture, DLL, eseguibili, archivi, immagini, file binari o > 1 MB; `RELEASE-MANIFEST.txt` con SHA-256.
+- `docs/NEXUS-PAGE.md`: testo della pagina Nexus/ModDB (BBCode), requisiti, avvertenze, screenshot.
+### Changed (Licenze)
+- CREDITS: RenoDX (repository) MIT, Carlos Lopez Jr.; add-on DLSS 5 distribuito solo in binario dal
+  Discord RenoDX, senza licenza dichiarata: mai incluso ne' ridistribuito, solo citato e linkato.
+  ReShade BSD-3-Clause confermata. Rimosso DLSS5-Feeder (non usato).
 ### Added (Installazione completa per l'utente)
 - `IAVATAR_Setup.ps1`: un solo comando per Modulo A + texture; `-Uninstall`, `-SkipNeural`, `-SkipTextures`.
 - Modulo A `-Auto`: trova l'add-on RenoDX (Download, `C:\IAVATAR_input`) e le DLL NVIDIA di RTX Remix,
@@ -44,6 +55,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [
 - Preset ufficiale "IAVATAR" in `presets/ReShade.ini`, tarato in gioco: 1 passata, stile naturale,
   maschera personaggi, stabilizzazione del look (~3,5 ms GPU a 1080p su RTX 5060 Ti).
   Pannello ReShade su F9.
+## [0.1.0] - 2026-10-28
 ### Added
 - Modulo A v0.1.0: installer `moduleA-enabler/src/IAVATAR_NeuralViceCity.ps1` (PowerShell 5.1)
   con `-Status`, `-Verify`, `-Install`, `-Uninstall`, `-DryRun`.
