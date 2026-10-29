@@ -43,3 +43,13 @@ successiva, da valutare dopo il pilota.
 - Pak risultante: 840 MB (1,2 GB non compresso).
 - Il preset di Tommy usa i MI in `Characters/Tommy/export_01` (letti da `SK_player`), non le copie in
   `Peds`/`Textures/Character`.
+
+## Pak separati (2026-10-29)
+- `IAVATAR_NeuralViceCity_Characters_P.pak` (ricetta `characters-v3`): pelle + vestiti + capelli,
+  853 texture, 1,75 GB. Testato in gioco: stabile.
+- `IAVATAR_NeuralViceCity_Environment_P.pak` (ricetta `environment-v1`): 4.379 MI ambiente letti,
+  3.624 texture lavorate (BaseColor + Normal, >= 256 px, parent MI_Env_P_Base / Masked / Env_Base),
+  60 saltate, 10.841 file, 1,09 GB.
+- `PakWriter`: scrittura in streaming e riprendibile (`.part` + `.state.json`), memoria costante.
+- Verifica: indice completo + campione riletto e confrontato con la cache.
+- Texture ridotte in cottura: lavorate alla risoluzione del primo mip presente (`iav_texture.effective`).

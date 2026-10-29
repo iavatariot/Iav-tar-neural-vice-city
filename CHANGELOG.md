@@ -4,6 +4,8 @@ Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [
 
 ## [Unreleased]
 ### Added (Modulo B)
+- Pak separati Characters (853 texture: pelle, vestiti, capelli) e Environment (3.624 texture).
+- PakWriter in streaming e riprendibile; build con budget di tempo e cache.
 - Pipeline texture senza editor: estrazione selettiva (Oodle), parser Texture2D cotte, ricodifica
   in-place stesso formato/risoluzione/mip, writer pak v11 con path hash index verificato.
 - Lettura parametri dei MaterialInstance (formato binario di questa build).
