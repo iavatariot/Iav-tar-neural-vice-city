@@ -14,7 +14,8 @@ Mod **single-player e gratuita** per *Grand Theft Auto: Vice City – The Defini
 **neural rendering di DLSS 5** sul DLSS nativo del gioco e **oltre 2.700 texture dell'ambiente ingrandite
 2x con l'IA**, con normal map ricostruite e personaggi più definiti.
 
-> **Versione 0.2.0** — validata in gioco su RTX 5060 Ti (2026-10-29). Download: Nexus Mods / ModDB
+> **Versione 0.2.0** — validata in gioco su RTX 5060 Ti (2026-10-29).
+> **Download: [Nexus Mods](https://www.nexusmods.com/grandtheftautothetrilogy/mods/1168)**
 > (pacchetto creato con `release/New-IavRelease.ps1`).
 
 *English: free single-player mod for GTA Vice City – The Definitive Edition. DLSS 5 neural rendering plus

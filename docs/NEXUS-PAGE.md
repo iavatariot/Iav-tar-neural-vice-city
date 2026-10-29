@@ -1,5 +1,7 @@
 # Pagina Nexus Mods / ModDB — IAVAT@R Neural Vice City v0.2.0
 
+Pubblicata il 2026-10-29: https://www.nexusmods.com/grandtheftautothetrilogy/mods/1168
+
 Materiale pronto da incollare. Su **Nexus** la descrizione accetta BBCode (sezione "Description");
 su **ModDB** incolla la versione Markdown/testo semplice (stesse sezioni, senza tag).
 
