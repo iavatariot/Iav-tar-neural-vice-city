@@ -1,0 +1,34 @@
+{
+  "name": "environment-v2",
+  "description": "Ambiente v2: micro-rilievo piu' fine e meno intenso (in gioco la v1 risultava granulosa sui muri lisci, amplificata dal neural rendering), nitidezza piu' leggera.",
+  "pak_name": "IAVATAR_NeuralViceCity_Environment_P.pak",
+  "rules": [
+    {
+      "manifest": "environment.json",
+      "parents": [
+        "MI_Env_P_Base",
+        "MI_Env_Masked_P_Base",
+        "MI_Env_Base"
+      ],
+      "min_size": 256,
+      "basecolor_ops": [
+        {
+          "op": "unsharp",
+          "radius": 1.0,
+          "percent": 35,
+          "threshold": 4
+        }
+      ],
+      "normal_ops": [
+        {
+          "op": "normal_detail",
+          "albedo_strength": 0.45,
+          "albedo_radius": 2.0,
+          "pore_strength": 0.0,
+          "bump": 3.0,
+          "seed": 1986
+        }
+      ]
+    }
+  ]
+}
