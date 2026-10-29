@@ -58,6 +58,7 @@ if (-not $SkipTextures) {
     if ($code -ne 0) { Write-Host 'Texture non installate: leggi il log indicato sopra. Rilanciando, la costruzione riprende da dove si e'' fermata.' -ForegroundColor Yellow; exit $code }
 }
 Write-Host ''
-Write-Host 'Fatto. Ultimo passo consigliato (non automatizzabile): NVIDIA App > Grafica > GTA Vice City DE >' -ForegroundColor Green
-Write-Host '  Override DLSS - Super Resolution: DLAA, preset modello: Piu'' recente. Dettagli in docs\INSTALL.md.' -ForegroundColor Green
+Write-Host 'Fatto. Ultimo passo consigliato (non automatizzabile) contro i bordi seghettati:' -ForegroundColor Green
+Write-Host '  Pannello di controllo NVIDIA > DSR - Fattori: DL 2,25x, poi nel gioco risoluzione 2880x1620 (su 1080p).' -ForegroundColor Green
+Write-Host '  L''override DLSS dell''app NVIDIA non e'' supportato per questo gioco. Dettagli in docs\INSTALL.md.' -ForegroundColor Green
 exit 0

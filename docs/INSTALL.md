@@ -46,12 +46,17 @@ Senza GPU RTX 50 installa solo le texture:
 powershell -ExecutionPolicy Bypass -File .\IAVATAR_Setup.ps1 -SkipNeural
 ```
 
-### Ultimo passo consigliato (manuale, 1 minuto): anti-aliasing
-Il gioco usa DLSS 2.3 "Qualità" (immagine calcolata a 1281x721 su 1080p): i bordi contro il cielo
-restano seghettati. Non è modificabile dai file del gioco, si imposta dall'app NVIDIA:
-**App NVIDIA → Grafica → GTA Vice City – The Definitive Edition → Override DLSS – Super Resolution:
-`DLAA`**, **Preset del modello: `Più recente`**. Se vuoi ancora più nitidezza: Pannello di controllo
-NVIDIA → Impostazioni 3D → **DSR – Fattori: DL 2.25x**, poi nel gioco scegli la risoluzione più alta.
+### Ultimo passo consigliato (manuale, 2 minuti): anti-aliasing con DLDSR
+Il gioco usa DLSS 2.3 "Qualità" (immagine calcolata a 1281x721 su 1080p): i bordi contro il cielo e le
+ringhiere restano seghettati. L'**override DLSS dell'app NVIDIA non è disponibile** per questo gioco
+(la scheda mostra "Non supportato") e il plugin DLSS del gioco non ha né DLAA né cvar per i preset.
+La strada che funziona è il **DLDSR**, che fa calcolare al gioco un'immagine più grande e la riduce:
+1. **Pannello di controllo NVIDIA → Gestisci le impostazioni 3D → Impostazioni globali →
+   DSR - Fattori: spunta `DL 2,25x`** (DSR - Uniformità: 33%, il valore predefinito va bene).
+2. Nel gioco: **Impostazioni → Grafica → Risoluzione: 2880x1620** (su monitor 1080p), DLSS su Qualità.
+Risultato: DLSS e neural rendering lavorano a 1920x1080 invece che a 1281x721, i bordi si puliscono e il
+dettaglio delle texture HD si vede meglio. Costo: circa il 30-40% di fps in meno (sulla RTX 5060 Ti da
+~105 a ~65-75 fps con il neural rendering acceso). Per tornare indietro rimetti la risoluzione nativa.
 
 ## In gioco
 | Tasto | Funzione |

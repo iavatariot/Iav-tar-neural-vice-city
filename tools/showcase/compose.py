@@ -9,7 +9,7 @@ Gli originali non vengono mai modificati: si leggono e basta.
 
 Uso:  python compose.py scenes.json OUT_DIR
 scenes.json: [{"name":..., "title":..., "vanilla":"<path base senza .png>", "mod":"<path base>",
-               "crop":[x,y,w,h]}]   (crop in pixel della cattura 1920x1080)
+               "crop":[x,y,w,h], "crop_mod":[x,y,w,h] (opzionale)}]   (pixel della cattura 1920x1080)
 """
 import json
 import os
@@ -57,13 +57,21 @@ CASES = [  # (sessione, NR, titolo, sottotitolo)
 ]
 
 
+def crop_for(scene, session):
+    """Ritaglio dello zoom: 'crop' per entrambe le sessioni, oppure 'crop_mod' separato quando l'inquadratura
+    della sessione con le mod non coincide al pixel (stessa superficie, posizione diversa sullo schermo)."""
+    if session == "mod" and scene.get("crop_mod"):
+        return scene["crop_mod"]
+    return scene["crop"]
+
+
 def compose(scene, out_dir):
     imgs = [load(scene[s], nr) for s, nr, _, _ in CASES]
     W, H = 960, 540
     grid = Image.new("RGB", (W * 2, H * 2), (0, 0, 0))
     for i, (im, (_, _, t, st)) in enumerate(zip(imgs, CASES)):
         tile = label(im.resize((W, H), Image.LANCZOS), t, st)
-        x, y, cw, ch = [v // 2 for v in scene["crop"]]   # riquadro dello zoom
+        x, y, cw, ch = [v // 2 for v in crop_for(scene, CASES[i][0])]   # riquadro dello zoom
         ImageDraw.Draw(tile).rectangle([x, y, x + cw, y + ch], outline=(255, 80, 200), width=2)
         grid.paste(tile, ((i % 2) * W, (i // 2) * H))
     d = ImageDraw.Draw(grid)
@@ -75,7 +83,8 @@ def compose(scene, out_dir):
     zh = int(zw * ch / cw)
     strip = Image.new("RGB", (2 * W, zh + 60), (12, 12, 22))
     for i, (im, (_, _, t, _)) in enumerate(zip(imgs, CASES)):
-        z = im.crop((x, y, x + cw, y + ch)).resize((zw, zh), Image.LANCZOS)
+        cx, cy, ccw, cch = crop_for(scene, CASES[i][0])
+        z = im.crop((cx, cy, cx + ccw, cy + cch)).resize((zw, zh), Image.LANCZOS)
         strip.paste(label(z, t), (i * zw, 60))
         if i:
             ImageDraw.Draw(strip).line([(i * zw, 60), (i * zw, zh + 60)], fill=(255, 255, 255), width=3)
