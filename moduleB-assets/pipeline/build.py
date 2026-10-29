@@ -77,7 +77,7 @@ def op_normal_detail(img, p, ctx):
     nz = np.sqrt(np.clip(1.0 - (n ** 2).sum(-1), 0.0, 1.0))
     height = np.zeros((h, w), np.float32)
     if p.get('albedo'):
-        alb = _decode_asset_image(p['albedo'], ctx['src']).convert('L').resize((w, h), Image.BICUBIC)
+        alb = _albedo_image(p, ctx).convert('L').resize((w, h), Image.BICUBIC)
         lum = np.asarray(alb, np.float32) / 255.0
         blur = np.asarray(alb.filter(ImageFilter.GaussianBlur(p.get('albedo_radius', 3.0))), np.float32) / 255.0
         height += (lum - blur) * p.get('albedo_strength', 1.0)
@@ -100,7 +100,77 @@ def op_normal_detail(img, p, ctx):
     return Image.fromarray(out, 'RGB')
 
 
-OPS = {'hue_tint': lambda img, p, ctx: op_hue_tint(img, p), 'unsharp': op_unsharp, 'normal_detail': op_normal_detail}
+def upscale_name(asset: str) -> str:
+    """Nome file dell'immagine scambiata con l'upscaler esterno (Real-ESRGAN)."""
+    return asset.replace('/', '__') + '.png'
+
+
+def _albedo_image(p, ctx):
+    """Albedo per il dettaglio della normal map: versione ingrandita dall'IA se disponibile, altrimenti originale."""
+    d = p.get('albedo_upscaled_dir')
+    if d:
+        f = os.path.join(d, upscale_name(p['albedo']))
+        if os.path.isfile(f):
+            return _crop_upscaled(Image.open(f), p.get('pad', 16) * p.get('model_scale', 4))
+    return _decode_asset_image(p['albedo'], ctx['src'])
+
+
+def _crop_upscaled(im, pad):
+    im.load()
+    return im.crop((pad, pad, im.width - pad, im.height - pad)) if pad else im
+
+
+def op_ai_upscale(img, p, ctx):
+    """Sostituisce l'immagine con la versione ingrandita da Real-ESRGAN (file PNG prodotto fuori da qui),
+    tolto il bordo di padding, e la porta a scale x la risoluzione originale. L'alpha resta quella originale
+    ingrandita in bicubica (l'IA lavora solo su RGB)."""
+    f = os.path.join(p['dir'], upscale_name(ctx['asset']))
+    if not os.path.isfile(f):
+        raise FileNotFoundError(f'immagine ingrandita mancante: {f}')
+    s = p.get('scale', 2)
+    W, H = img.width * s, img.height * s
+    up = _crop_upscaled(Image.open(f).convert('RGB'), p.get('pad', 16) * p.get('model_scale', 4))
+    exp = (img.width * p.get('model_scale', 4), img.height * p.get('model_scale', 4))
+    if up.size != exp:
+        raise ValueError(f'immagine ingrandita {up.size}, attesa {exp}')
+    out = up.resize((W, H), Image.LANCZOS)
+    if img.mode == 'RGBA':
+        out.putalpha(img.getchannel('A').resize((W, H), Image.BICUBIC))
+    return out
+
+
+def op_resize_normal(img, p, ctx):
+    """Ingrandisce una normal map (bicubica) e rinormalizza X,Y. Per le normal l'IA non e' adatta."""
+    if p.get('to_albedo'):
+        # stessa risoluzione dell'albedo ingrandito (albedo originale x ai_scale), mai oltre MAX_SIZE
+        ai = T.effective(T.parse(ctx['src'].get(p['to_albedo'] + '.uexp')))
+        target = min(MAX_SIZE, ai.width * p.get('ai_scale', 2))
+        s = max(1, target // img.width)
+    else:
+        s = p.get('scale', 2)
+    if s == 1:
+        return img
+    W, H = img.width * s, img.height * s
+    big = img.convert('RGB').resize((W, H), Image.BICUBIC)
+    n = np.asarray(big, np.float32)[..., :2] / 127.5 - 1.0
+    l = np.sqrt(np.clip((n ** 2).sum(-1), 1.0, None))
+    n = n / l[..., None]
+    out = np.zeros((H, W, 3), np.uint8)
+    out[..., 0] = np.clip((n[..., 0] + 1.0) * 127.5, 0, 255)
+    out[..., 1] = np.clip((n[..., 1] + 1.0) * 127.5, 0, 255)
+    return Image.fromarray(out, 'RGB')
+
+
+def pad_for_upscale(img: Image.Image, pad: int, wrap: bool) -> Image.Image:
+    """Bordo attorno alla texture prima dell'IA: 'wrap' per le texture ripetute (evita cuciture), 'edge' altrimenti."""
+    a = np.asarray(img.convert('RGB'))
+    a = np.pad(a, ((pad, pad), (pad, pad), (0, 0)), mode='wrap' if wrap else 'edge')
+    return Image.fromarray(a, 'RGB')
+
+
+OPS = {'hue_tint': lambda img, p, ctx: op_hue_tint(img, p), 'unsharp': op_unsharp, 'normal_detail': op_normal_detail,
+       'ai_upscale': op_ai_upscale, 'resize_normal': op_resize_normal}
+MAX_SIZE = 2048   # MaxLODSize dei gruppi World/Character nel profilo Windows: oltre, il motore scarta i mip
 
 
 class Source:
@@ -135,10 +205,16 @@ def expand_rules(recipe, manifest_dir):
             min_size = rule.get('min_size', 0)
             fmt_ok = lambda t: (man['texture_info'].get(t, {}).get('format') in ENCODE  # noqa: E731
                                 and (man['texture_info'].get(t, {}).get('size') or 0) >= min_size)
-            if rule.get('basecolor_ops') and bc not in seen and fmt_ok(bc):
+            max_size = rule.get('max_size')
+            bc_ok = fmt_ok(bc) and (not max_size or (man['texture_info'].get(bc, {}).get('size') or 0) <= max_size)
+            if rule.get('basecolor_ops') and bc not in seen and bc_ok:
                 items.append({'asset': bc, 'ops': rule['basecolor_ops']}); seen.add(bc)
+            if max_size and not bc_ok:
+                continue
             if rule.get('normal_ops') and nm.startswith('Gameface/Content/ViceCity/') and nm not in seen and fmt_ok(nm):
-                ops = [dict(o, albedo=bc) if o['op'] == 'normal_detail' else o for o in rule['normal_ops']]
+                ops = [dict(o, albedo=bc) if o['op'] == 'normal_detail' else
+                       dict(o, to_albedo=bc) if o['op'] == 'resize_normal' and o.get('to_albedo') else o
+                       for o in rule['normal_ops']]
                 items.append({'asset': nm, 'ops': ops}); seen.add(nm)
     return items
 
@@ -155,17 +231,34 @@ def process_texture(asset: str, ops: list, src):
     img = Image.open(io.BytesIO(T.to_dds(info, ue, ub)))
     img.load()
     for op in ops:
-        img = OPS[op['op']](img, op, {'src': src})
-    if img.size != (info.width, info.height):
-        raise ValueError('la lavorazione ha cambiato la risoluzione: non consentito')
-    mips = []
-    for m in info.mips:
-        w = max(4, m.width)
-        h = max(4, m.height)
-        level = img if (w, h) == img.size else img.resize((w, h), Image.BOX)
-        mips.append(encode_mip(level, info.pixel_format, m.size))
-    new_ue, new_ub = T.inject(info, ue, ub, mips)
-    out = {asset + '.uasset': src.get(asset + '.uasset'), asset + '.uexp': new_ue}
+        img = OPS[op['op']](img, op, {'src': src, 'asset': asset})
+    if img.size == (info.width, info.height):
+        mips = []
+        for m in info.mips:
+            w = max(4, m.width)
+            h = max(4, m.height)
+            level = img if (w, h) == img.size else img.resize((w, h), Image.BOX)
+            mips.append(encode_mip(level, info.pixel_format, m.size))
+        new_ue, new_ub = T.inject(info, ue, ub, mips)
+        new_ua = src.get(asset + '.uasset')
+    else:
+        # risoluzione maggiore: nuova catena mip completa e header riscritti (iav_texture.rebuild)
+        W, H = img.size
+        if max(W, H) > MAX_SIZE or W & (W - 1) or H & (H - 1):
+            raise ValueError(f'risoluzione {W}x{H} non valida (potenza di 2, max {MAX_SIZE})')
+        if info.first_mip != 0 or info.mips[0].width != info.width:
+            raise ValueError('texture ridotta in cottura: ingrandimento non supportato')
+        mips = []
+        w, h = W, H
+        while True:
+            level = img if (w, h) == img.size else img.resize((max(4, w), max(4, h)), Image.BOX)
+            mips.append(encode_mip(level, info.pixel_format, T.mip_bytes(info.pixel_format, w, h)))
+            if w == 1 and h == 1:
+                break
+            w, h = max(1, w // 2), max(1, h // 2)
+        new_ua, new_ue, new_ub = T.rebuild(info, src.get(asset + '.uasset'), ue, ub, W, H, mips)
+        info = T.parse(new_ue)
+    out = {asset + '.uasset': new_ua, asset + '.uexp': new_ue}
     if new_ub is not None:
         out[asset + '.ubulk'] = new_ub
     return out, info

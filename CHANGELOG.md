@@ -3,6 +3,14 @@
 Formato: [Keep a Changelog](https://keepachangelog.com/it/1.1.0/) · Versioni: [SemVer](https://semver.org/lang/it/).
 
 ## [Unreleased]
+### Added (Showcase)
+- `tools/showcase/compose.py`: confronti 4 riquadri Vanilla / Solo texture / Solo DLSS 5 / Completo
+  dalle catture F5, con fascia di zoom sullo stesso punto. Gli screenshot originali non vengono toccati.
+- `tools/showcase/texture_sheet.py`: tavole "originale vs IAVAT@R" con il materiale illuminato da luce
+  radente (BaseColor x normal map), lette dal pak del gioco e dalla cache della build.
+### Changed (Modulo B)
+- Ricetta `environment-v2`: micro-rilievo piu' fine e meno intenso (la v1 risultava granulosa sui muri
+  lisci, amplificata dal neural rendering). Pak Environment 1.061,7 MB.
 ### Added (Modulo B)
 - Pak separati Characters (853 texture: pelle, vestiti, capelli) e Environment (3.624 texture).
 - PakWriter in streaming e riprendibile; build con budget di tempo e cache.

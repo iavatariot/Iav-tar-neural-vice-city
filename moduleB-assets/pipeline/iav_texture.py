@@ -120,3 +120,117 @@ def effective(info: TextureInfo) -> TextureInfo:
         return info
     m0 = info.mips[0]
     return TextureInfo(info.pixel_format, m0.width, m0.height, len(info.mips), 0, info.mips)
+
+
+# ------------------------------------------------------------------ texture a risoluzione maggiore
+MIP_ENTRY_FIXED = 4 + 4 + 4 + 4 + 8 + 12   # bCooked, flag, count, size, offset, w/h/d (size a 32 bit)
+
+
+def _set_imported_size(uasset: bytes, uexp: bytes, w: int, h: int) -> bytes:
+    """Aggiorna la proprieta' ImportedSize (IntPoint) se presente; il resto delle proprieta' resta invariato."""
+    from iav_uasset import Package
+    pkg = Package(uasset, uexp)
+    if 'ImportedSize' not in pkg.names or 'IntPoint' not in pkg.names:
+        return uexp
+    key = struct.pack('<ii', pkg.names.index('ImportedSize'), 0)
+    p = 0
+    ue = bytearray(uexp)
+    end = uexp.find(b'PF_')
+    while True:
+        p = uexp.find(key, p)
+        if p < 0 or p > end:
+            return bytes(ue)
+        if struct.unpack_from('<ii', uexp, p + 24)[0] == pkg.names.index('IntPoint'):
+            vpos = p + 8 + 8 + 8 + 8 + 16 + 1
+            struct.pack_into('<ii', ue, vpos, w, h)
+            return bytes(ue)
+        p += 1
+
+
+def rebuild(info: TextureInfo, uasset: bytes, uexp: bytes, ubulk: bytes | None,
+            new_w: int, new_h: int, new_mips: list[bytes]) -> tuple[bytes, bytes, bytes | None]:
+    """Riscrive la catena mip con una risoluzione diversa (tipicamente 2x).
+
+    Layout cotto UE 4.26 (verificato su questa build):
+      FName PixelFormat | int64 SkipOffset (assoluto, = inizio del FName 'None' finale)
+      | SizeX SizeY Packed | FString PF_xxx | FirstMip NumMips | mip[] | bIsVirtual | FName None | tag
+      mip = bCooked, BulkFlags, Count, Size, Offset(int64), [dati se inline], SizeX SizeY SizeZ
+      Offset dei mip inline = posizione assoluta nel file uasset+uexp; dei mip separati = posizione nel .ubulk.
+    Politica: gli ultimi K mip restano inline come nell'originale (K = numero originale di inline), gli altri
+    vanno nel .ubulk, contigui. Aggiorna anche nel .uasset SerialSize dell'export e BulkDataStartOffset.
+    """
+    if info.first_mip != 0 or info.mips[0].width != info.width:
+        raise ValueError('texture ridotta in cottura: rebuild non supportato')
+    if any(m.flags & BULK_SIZE64 for m in info.mips):
+        raise ValueError('mip con size a 64 bit: non supportato')
+    inline_k = sum(1 for m in info.mips if not m.separate)
+    sep_flags = next((m.flags for m in info.mips if m.separate), None)
+    inl_flags = next((m.flags for m in info.mips if not m.separate), None)
+    fmt = info.pixel_format
+    dims = []
+    w, h = new_w, new_h
+    while True:
+        dims.append((w, h))
+        if w == 1 and h == 1:
+            break
+        w, h = max(1, w // 2), max(1, h // 2)
+    if len(new_mips) != len(dims):
+        raise ValueError(f'servono {len(dims)} mip per {new_w}x{new_h}, forniti {len(new_mips)}')
+    for (w, h), d in zip(dims, new_mips):
+        if len(d) != mip_bytes(fmt, w, h):
+            raise ValueError(f'mip {w}x{h}: {len(d)} byte, attesi {mip_bytes(fmt, w, h)}')
+    n = len(dims)
+    if sep_flags is None:
+        inline_k = n            # texture tutta inline: resta tutta inline
+    if inl_flags is None:
+        inline_k = 0
+
+    i = uexp.find(b'PF_')
+    slen = struct.unpack_from('<i', uexp, i - 4)[0]
+    head = uexp[:i - 24]                       # fino a FName PixelFormat incluso
+    last = info.mips[-1]
+    if last.separate:
+        raise ValueError('ultimo mip non inline: layout inatteso')
+    tail = uexp[last.inline_pos + last.size + 12:]   # bIsVirtual + FName None + tag
+    base = len(uasset)
+
+    out = bytearray(head)
+    skip_pos = len(out); out += b'\0' * 8
+    out += struct.pack('<iii', new_w, new_h, struct.unpack_from('<i', uexp, i - 8)[0])
+    out += uexp[i - 4:i + slen]
+    out += struct.pack('<ii', 0, n)
+    bulk = bytearray()
+    for k, ((w, h), d) in enumerate(zip(dims, new_mips)):
+        inline = k >= n - inline_k
+        out += struct.pack('<i', 1)
+        if inline:
+            out += struct.pack('<Iii', inl_flags, len(d), len(d))
+            data_pos = len(out) + 8
+            out += struct.pack('<q', base + data_pos)
+            out += d
+        else:
+            out += struct.pack('<Iii', sep_flags, len(d), len(d))
+            out += struct.pack('<q', len(bulk))
+            bulk += d
+        out += struct.pack('<iii', max(4, w) if fmt in BLOCK_BYTES else w, max(4, h) if fmt in BLOCK_BYTES else h, 1)
+    none_pos = len(out) + 4                    # dopo bIsVirtual
+    out += tail
+    struct.pack_into('<q', out, skip_pos, base + none_pos)
+    new_uexp = _set_imported_size(uasset, bytes(out), new_w, new_h)
+
+    ua = bytearray(uasset)
+    old_ser, new_ser = len(uexp) - 4, len(new_uexp) - 4
+    old_bulk, new_bulk = base + len(uexp) - 4, base + len(new_uexp) - 4
+    hits = 0
+    for j in range(0, len(ua) - 15):
+        if struct.unpack_from('<qq', ua, j) == (old_ser, base):          # export: SerialSize, SerialOffset
+            struct.pack_into('<q', ua, j, new_ser); hits += 1
+    j = 0
+    while True:
+        j = bytes(ua).find(struct.pack('<q', old_bulk), j)
+        if j < 0:
+            break
+        struct.pack_into('<q', ua, j, new_bulk); hits += 1; j += 8
+    if hits != 2:
+        raise ValueError(f'uasset: attesi 2 campi da aggiornare (SerialSize, BulkDataStartOffset), trovati {hits}')
+    return bytes(ua), new_uexp, (bytes(bulk) if bulk else None)

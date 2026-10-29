@@ -1,0 +1,44 @@
+{
+  "name": "environment-hd-v1",
+  "description": "Ambiente HD: albedo 128-1024 px ingranditi 2x con Real-ESRGAN (x4plus, poi ridotti a 2x); normal map portate alla stessa risoluzione (max 2048, limite del profilo Windows) con micro-rilievo ricavato dall'albedo IA. Pak _9_P: prevale sul pak Environment v2 per le texture che contiene.",
+  "pak_name": "IAVATAR_NeuralViceCity_HD_9_P.pak",
+  "rules": [
+    {
+      "manifest": "environment.json",
+      "parents": [
+        "MI_Env_P_Base",
+        "MI_Env_Masked_P_Base",
+        "MI_Env_Base"
+      ],
+      "min_size": 128,
+      "max_size": 1024,
+      "basecolor_ops": [
+        {
+          "op": "ai_upscale",
+          "dir": "../../work/upscale/out",
+          "scale": 2,
+          "pad": 16,
+          "model_scale": 2
+        }
+      ],
+      "normal_ops": [
+        {
+          "op": "resize_normal",
+          "to_albedo": true,
+          "ai_scale": 2
+        },
+        {
+          "op": "normal_detail",
+          "albedo_upscaled_dir": "../../work/upscale/out",
+          "pad": 16,
+          "model_scale": 2,
+          "albedo_strength": 0.8,
+          "albedo_radius": 3.0,
+          "bump": 4.0,
+          "pore_strength": 0.0,
+          "seed": 1986
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "name": "hd-test",
+  "description": "SMOKE TEST risoluzione maggiore: marciapiedi e cemento di Ocean Beach ingranditi 2x con Real-ESRGAN (albedo) e normal map ingrandite con micro-rilievo ricavato dall'albedo IA. Pak con priorita' superiore (_9_P) per prevalere sul pak Environment.",
+  "pak_name": "IAVATAR_NeuralViceCity_HD_9_P.pak",
+  "textures": [
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_Bow_sidewalk_BC",
+      "ops": [
+        {
+          "op": "ai_upscale",
+          "dir": "../../work/upscale/out_test",
+          "scale": 2,
+          "pad": 16,
+          "model_scale": 4
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_Bow_sidewalk_alt_BC",
+      "ops": [
+        {
+          "op": "ai_upscale",
+          "dir": "../../work/upscale/out_test",
+          "scale": 2,
+          "pad": 16,
+          "model_scale": 4
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_Newpavement_BC",
+      "ops": [
+        {
+          "op": "ai_upscale",
+          "dir": "../../work/upscale/out_test",
+          "scale": 2,
+          "pad": 16,
+          "model_scale": 4
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_dt_pavement_BC",
+      "ops": [
+        {
+          "op": "ai_upscale",
+          "dir": "../../work/upscale/out_test",
+          "scale": 2,
+          "pad": 16,
+          "model_scale": 4
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_pavement1256_BC",
+      "ops": [
+        {
+          "op": "ai_upscale",
+          "dir": "../../work/upscale/out_test",
+          "scale": 2,
+          "pad": 16,
+          "model_scale": 4
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_concretenew256_BC",
+      "ops": [
+        {
+          "op": "ai_upscale",
+          "dir": "../../work/upscale/out_test",
+          "scale": 2,
+          "pad": 16,
+          "model_scale": 4
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_Bow_sidewalk_N",
+      "ops": [
+        {
+          "op": "resize_normal",
+          "scale": 4
+        },
+        {
+          "op": "normal_detail",
+          "albedo": "Gameface/Content/ViceCity/Textures/Tilables/T_Bow_sidewalk_BC",
+          "albedo_upscaled_dir": "../../work/upscale/out_test",
+          "pad": 16,
+          "model_scale": 4,
+          "albedo_strength": 0.8,
+          "albedo_radius": 3.0,
+          "bump": 4.0,
+          "pore_strength": 0.0,
+          "seed": 1986
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_Newpavement_N",
+      "ops": [
+        {
+          "op": "resize_normal",
+          "scale": 2
+        },
+        {
+          "op": "normal_detail",
+          "albedo": "Gameface/Content/ViceCity/Textures/Tilables/T_Newpavement_BC",
+          "albedo_upscaled_dir": "../../work/upscale/out_test",
+          "pad": 16,
+          "model_scale": 4,
+          "albedo_strength": 0.8,
+          "albedo_radius": 3.0,
+          "bump": 4.0,
+          "pore_strength": 0.0,
+          "seed": 1986
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_dt_pavement_N",
+      "ops": [
+        {
+          "op": "resize_normal",
+          "scale": 2
+        },
+        {
+          "op": "normal_detail",
+          "albedo": "Gameface/Content/ViceCity/Textures/Tilables/T_dt_pavement_BC",
+          "albedo_upscaled_dir": "../../work/upscale/out_test",
+          "pad": 16,
+          "model_scale": 4,
+          "albedo_strength": 0.8,
+          "albedo_radius": 3.0,
+          "bump": 4.0,
+          "pore_strength": 0.0,
+          "seed": 1986
+        }
+      ]
+    },
+    {
+      "asset": "Gameface/Content/ViceCity/Textures/Tilables/T_concretenew256_N",
+      "ops": [
+        {
+          "op": "resize_normal",
+          "scale": 2
+        },
+        {
+          "op": "normal_detail",
+          "albedo": "Gameface/Content/ViceCity/Textures/Tilables/T_concretenew256_BC",
+          "albedo_upscaled_dir": "../../work/upscale/out_test",
+          "pad": 16,
+          "model_scale": 4,
+          "albedo_strength": 0.8,
+          "albedo_radius": 3.0,
+          "bump": 4.0,
+          "pore_strength": 0.0,
+          "seed": 1986
+        }
+      ]
+    }
+  ]
+}
